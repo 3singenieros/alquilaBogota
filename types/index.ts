@@ -9,6 +9,7 @@ export type EstadoNoRenovacion = "SOLICITADA" | "EN_REVISION" | "ACEPTADA" | "RE
 
 export interface Usuario {
   id: string;
+  code: string;
   nombre: string;
   email: string;
   rol: Rol;
@@ -19,6 +20,7 @@ export interface Usuario {
 
 export interface Inmueble {
   id: string;
+  code: string;
   titulo: string;
   direccion: string;
   ciudad: string;
@@ -32,6 +34,7 @@ export interface Inmueble {
 
 export interface Contrato {
   id: string;
+  code: string;
   inmuebleId: string;
   arrendatarioId: string;
   arrendadorId: string;
@@ -45,6 +48,7 @@ export interface Contrato {
 
 export interface PagoReportado {
   id: string;
+  code: string;
   contratoId: string;
   mes: string;
   monto: number;
@@ -57,6 +61,7 @@ export interface PagoReportado {
 
 export interface ServicioPublico {
   id: string;
+  code: string;
   inmuebleId: string;
   tipo: string;
   periodo: string;
@@ -68,6 +73,7 @@ export interface ServicioPublico {
 
 export interface Mantenimiento {
   id: string;
+  code: string;
   inmuebleId: string;
   titulo: string;
   descripcion: string;
@@ -81,6 +87,7 @@ export interface Mantenimiento {
 
 export interface NoRenovacion {
   id: string;
+  code: string;
   contratoId: string;
   motivo: string;
   fechaSolicitud: string;
@@ -105,6 +112,6 @@ export interface Incidencia {
   fecha: string;
 }
 
-export type CreateInput<T extends { id: string }> = Omit<T, "id" | "creadoEn"> &
+export type CreateInput<T extends { id: string }> = Omit<T, "id" | "code" | "creadoEn"> &
   (T extends { creadoEn: string } ? Partial<Pick<T, "creadoEn">> : object);
-export type UpdateInput<T extends { id: string }> = Partial<Omit<T, "id">>;
+export type UpdateInput<T extends { id: string }> = Partial<Omit<T, "id" | "code">>;

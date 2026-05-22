@@ -5,20 +5,27 @@ import {
   crearContrato,
   eliminarContrato,
 } from "@/services/contratos.service";
+import { revalidateContratoDependents } from "@/lib/revalidate-paths";
+import { listarContratosReferencia } from "@/services/contratos.service";
 import type { Contrato, CreateInput, UpdateInput } from "@/types";
-import { revalidatePath } from "next/cache";
+
+export async function listarContratosFormAction() {
+  return listarContratosReferencia();
+}
 
 export async function crearContratoAction(data: CreateInput<Contrato>) {
-  await crearContrato(data);
-  revalidatePath("/contratos");
+  const created = await crearContrato(data);
+  revalidateContratoDependents();
+  return created;
 }
 
 export async function actualizarContratoAction(id: string, data: UpdateInput<Contrato>) {
-  await actualizarContrato(id, data);
-  revalidatePath("/contratos");
+  const updated = await actualizarContrato(id, data);
+  revalidateContratoDependents();
+  return updated;
 }
 
 export async function eliminarContratoAction(id: string) {
   await eliminarContrato(id);
-  revalidatePath("/contratos");
+  revalidateContratoDependents();
 }

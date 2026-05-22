@@ -1,5 +1,6 @@
 "use client";
 
+import { listarInmueblesFormAction } from "@/app/(dashboard)/inmuebles/actions";
 import { crearMantenimientoAction } from "@/app/(dashboard)/mantenimiento/actions";
 import { FilterBar } from "@/components/shared/filter-bar";
 import { StatusBadge, estadoVariant } from "@/components/ui/badge";
@@ -9,31 +10,44 @@ import { Input } from "@/components/ui/input";
 import { PageHeader } from "@/components/ui/page-header";
 import { Select } from "@/components/ui/select";
 import { Table, Td, Th, Tr } from "@/components/ui/table";
+import { inmuebleDisplayFromId, inmuebleOptionLabel, inmueblesById } from "@/lib/entity-labels";
 import { getModulePermissions } from "@/lib/auth/permissions";
 import { formatDate } from "@/lib/utils";
-import type { EstadoMantenimiento, Mantenimiento, Rol } from "@/types";
+import type { EstadoMantenimiento, Inmueble, Mantenimiento, Rol } from "@/types";
 import { Plus } from "lucide-react";
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 
 const ESTADOS: EstadoMantenimiento[] = ["ABIERTO", "EN_PROGRESO", "RESUELTO", "CERRADO"];
 
 export function MantenimientoModule({
   initialData,
+  inmuebles,
   rol,
   usuarioId,
-  inmuebleIds,
 }: {
   initialData: Mantenimiento[];
+  inmuebles: Inmueble[];
   rol: Rol;
   usuarioId: string;
-  inmuebleIds: string[];
 }) {
   const perms = getModulePermissions(rol, "mantenimiento");
+  const [inmueblesOptions, setInmueblesOptions] = useState(inmuebles);
+  const inmueblesMap = useMemo(() => inmueblesById(inmueblesOptions), [inmueblesOptions]);
   const [items, setItems] = useState(initialData);
   const [search, setSearch] = useState("");
   const [estadoFilter, setEstadoFilter] = useState("");
   const [open, setOpen] = useState(false);
   const [pending, startTransition] = useTransition();
+
+  useEffect(() => {
+    setInmueblesOptions(inmuebles);
+  }, [inmuebles]);
+
+  async function openForm() {
+    const fresh = await listarInmueblesFormAction();
+    setInmueblesOptions(fresh);
+    setOpen(true);
+  }
 
   const filtered = useMemo(
     () =>
@@ -57,11 +71,8 @@ export function MantenimientoModule({
       solicitadoPorId: usuarioId,
     };
     startTransition(async () => {
-      await crearMantenimientoAction(payload);
-      setItems((prev) => [
-        ...prev,
-        { ...payload, id: `mnt-${Date.now()}`, creadoEn: new Date().toISOString().slice(0, 10) },
-      ]);
+      const created = await crearMantenimientoAction(payload);
+      if (created) setItems((prev) => [...prev, created]);
       setOpen(false);
     });
   }
@@ -73,7 +84,7 @@ export function MantenimientoModule({
         description="Solicitudes e incidencias de mantenimiento"
         action={
           perms.canCreate ? (
-            <Button onClick={() => setOpen(true)}>
+            <Button onClick={() => openForm()}>
               <Plus className="h-4 w-4" /> Nueva solicitud
             </Button>
           ) : undefined
@@ -89,6 +100,7 @@ export function MantenimientoModule({
       <Table>
         <thead>
           <tr>
+            <Th>Código</Th>
             <Th>Título</Th>
             <Th>Inmueble</Th>
             <Th>Prioridad</Th>
@@ -99,8 +111,9 @@ export function MantenimientoModule({
         <tbody>
           {filtered.map((m) => (
             <Tr key={m.id}>
+              <Td className="font-mono text-xs text-slate-600">{m.code}</Td>
               <Td className="font-medium">{m.titulo}</Td>
-              <Td>{m.inmuebleId}</Td>
+              <Td>{inmuebleDisplayFromId(m.inmuebleId, inmueblesMap)}</Td>
               <Td>
                 <StatusBadge
                   label={m.prioridad}
@@ -138,10 +151,10 @@ export function MantenimientoModule({
       >
         <form id="mnt-form" onSubmit={handleSubmit} className="space-y-4">
           <FormField label="Inmueble">
-            <Select name="inmuebleId" defaultValue={inmuebleIds[0]} required>
-              {inmuebleIds.map((id) => (
-                <option key={id} value={id}>
-                  {id}
+            <Select name="inmuebleId" defaultValue={inmueblesOptions[0]?.id} required>
+              {inmueblesOptions.map((inm) => (
+                <option key={inm.id} value={inm.id}>
+                  {inmuebleOptionLabel(inm)}
                 </option>
               ))}
             </Select>

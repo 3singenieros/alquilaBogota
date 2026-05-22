@@ -1,8 +1,8 @@
-import {
-  seedInmuebles,
-} from "@/data/mock/seed";
+import { seedInmuebles } from "@/data/mock/seed";
+import { ENTITY_CODE_PREFIX, generateUniqueCode } from "@/lib/entity-codes";
+import { buildMockEntity } from "@/lib/mock-create";
 import { getSupabaseClient } from "@/lib/supabase/client";
-import { createMockStore, newId } from "@/repositories/mock-store";
+import { createMockStore } from "@/repositories/mock-store";
 import type { CreateInput, Inmueble, UpdateInput } from "@/types";
 
 export interface InmueblesRepository {
@@ -19,11 +19,14 @@ export const inmueblesMockRepository: InmueblesRepository = {
   findAll: async () => mockStore.getAll(),
   findById: async (id) => mockStore.getById(id),
   create: async (data) => {
-    const item: Inmueble = {
-      ...data,
-      id: newId("inm"),
-      creadoEn: data.creadoEn ?? new Date().toISOString().slice(0, 10),
-    };
+    const item = buildMockEntity<Inmueble>(
+      ENTITY_CODE_PREFIX.inmueble,
+      {
+        ...data,
+        creadoEn: data.creadoEn ?? new Date().toISOString().slice(0, 10),
+      },
+      mockStore.getAll()
+    );
     return mockStore.create(item);
   },
   update: async (id, data) => mockStore.update(id, data),
@@ -34,7 +37,10 @@ export const inmueblesSupabaseRepository: InmueblesRepository = {
   findAll: async () => {
     const supabase = getSupabaseClient();
     if (!supabase) return [];
-    const { data, error } = await supabase.from("inmuebles").select("*").order("creado_en", { ascending: false });
+    const { data, error } = await supabase
+      .from("inmuebles")
+      .select("*")
+      .order("creado_en", { ascending: false });
     if (error) throw error;
     return (data ?? []).map(mapRow);
   },
@@ -48,7 +54,10 @@ export const inmueblesSupabaseRepository: InmueblesRepository = {
   create: async (input) => {
     const supabase = getSupabaseClient();
     if (!supabase) throw new Error("Supabase no configurado");
-    const row = toRow(input);
+    const { data: existing } = await supabase.from("inmuebles").select("code");
+    const codes = (existing ?? []).map((r) => r.code as string);
+    const code = generateUniqueCode(ENTITY_CODE_PREFIX.inmueble, codes);
+    const row = { ...toRow(input), code };
     const { data, error } = await supabase.from("inmuebles").insert(row).select().single();
     if (error) throw error;
     return mapRow(data);
@@ -56,7 +65,12 @@ export const inmueblesSupabaseRepository: InmueblesRepository = {
   update: async (id, input) => {
     const supabase = getSupabaseClient();
     if (!supabase) return null;
-    const { data, error } = await supabase.from("inmuebles").update(toRow(input)).eq("id", id).select().single();
+    const { data, error } = await supabase
+      .from("inmuebles")
+      .update(toRow(input))
+      .eq("id", id)
+      .select()
+      .single();
     if (error) return null;
     return mapRow(data);
   },
@@ -71,6 +85,7 @@ export const inmueblesSupabaseRepository: InmueblesRepository = {
 function mapRow(row: Record<string, unknown>): Inmueble {
   return {
     id: row.id as string,
+    code: row.code as string,
     titulo: row.titulo as string,
     direccion: row.direccion as string,
     ciudad: row.ciudad as string,

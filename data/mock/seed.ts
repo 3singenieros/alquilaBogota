@@ -13,6 +13,7 @@ import type {
 export const seedUsuarios: Usuario[] = [
   {
     id: "u-admin",
+    code: "u-admin",
     nombre: "Ana Administradora",
     email: "admin@demo.edu",
     rol: "ADMIN",
@@ -22,6 +23,7 @@ export const seedUsuarios: Usuario[] = [
   },
   {
     id: "u-arrendador",
+    code: "u-arrendador",
     nombre: "Carlos Arrendador",
     email: "arrendador@demo.edu",
     rol: "ARRENDADOR",
@@ -31,6 +33,7 @@ export const seedUsuarios: Usuario[] = [
   },
   {
     id: "u-arrendatario",
+    code: "u-arrendatario",
     nombre: "María Arrendataria",
     email: "arrendatario@demo.edu",
     rol: "ARRENDATARIO",
@@ -40,6 +43,7 @@ export const seedUsuarios: Usuario[] = [
   },
   {
     id: "u-arrendador-2",
+    code: "u-arrendador-2",
     nombre: "Luis Propietario",
     email: "luis@demo.edu",
     rol: "ARRENDADOR",
@@ -51,6 +55,7 @@ export const seedUsuarios: Usuario[] = [
 export const seedInmuebles: Inmueble[] = [
   {
     id: "inm-1",
+    code: "inm-1",
     titulo: "Apartamento Centro",
     direccion: "Calle 45 #12-30",
     ciudad: "Bogotá",
@@ -63,6 +68,7 @@ export const seedInmuebles: Inmueble[] = [
   },
   {
     id: "inm-2",
+    code: "inm-2",
     titulo: "Local Comercial Norte",
     direccion: "Av. 68 #25-10",
     ciudad: "Bogotá",
@@ -74,6 +80,7 @@ export const seedInmuebles: Inmueble[] = [
   },
   {
     id: "inm-3",
+    code: "inm-3",
     titulo: "Casa Campestre",
     direccion: "Km 5 Vía Chía",
     ciudad: "Chía",
@@ -88,6 +95,7 @@ export const seedInmuebles: Inmueble[] = [
 export const seedContratos: Contrato[] = [
   {
     id: "ctr-1",
+    code: "ctr-1",
     inmuebleId: "inm-1",
     arrendatarioId: "u-arrendatario",
     arrendadorId: "u-arrendador",
@@ -100,6 +108,7 @@ export const seedContratos: Contrato[] = [
   },
   {
     id: "ctr-2",
+    code: "ctr-2",
     inmuebleId: "inm-2",
     arrendatarioId: "u-arrendatario",
     arrendadorId: "u-arrendador",
@@ -114,6 +123,7 @@ export const seedContratos: Contrato[] = [
 export const seedPagos: PagoReportado[] = [
   {
     id: "pag-1",
+    code: "pag-1",
     contratoId: "ctr-1",
     mes: "2025-04",
     monto: 1800000,
@@ -124,6 +134,7 @@ export const seedPagos: PagoReportado[] = [
   },
   {
     id: "pag-2",
+    code: "pag-2",
     contratoId: "ctr-1",
     mes: "2025-05",
     monto: 1800000,
@@ -133,6 +144,7 @@ export const seedPagos: PagoReportado[] = [
   },
   {
     id: "pag-3",
+    code: "pag-3",
     contratoId: "ctr-2",
     mes: "2025-05",
     monto: 3200000,
@@ -145,6 +157,7 @@ export const seedPagos: PagoReportado[] = [
 export const seedServicios: ServicioPublico[] = [
   {
     id: "srv-1",
+    code: "srv-1",
     inmuebleId: "inm-1",
     tipo: "Agua",
     periodo: "2025-04",
@@ -154,6 +167,7 @@ export const seedServicios: ServicioPublico[] = [
   },
   {
     id: "srv-2",
+    code: "srv-2",
     inmuebleId: "inm-1",
     tipo: "Energía",
     periodo: "2025-05",
@@ -163,6 +177,7 @@ export const seedServicios: ServicioPublico[] = [
   },
   {
     id: "srv-3",
+    code: "srv-3",
     inmuebleId: "inm-2",
     tipo: "Gas",
     periodo: "2025-05",
@@ -175,6 +190,7 @@ export const seedServicios: ServicioPublico[] = [
 export const seedMantenimiento: Mantenimiento[] = [
   {
     id: "mnt-1",
+    code: "mnt-1",
     inmuebleId: "inm-1",
     titulo: "Fuga en lavamanos",
     descripcion: "Goteo constante en baño principal",
@@ -186,6 +202,7 @@ export const seedMantenimiento: Mantenimiento[] = [
   },
   {
     id: "mnt-2",
+    code: "mnt-2",
     inmuebleId: "inm-2",
     titulo: "Pintura fachada",
     descripcion: "Retoque zona frontal del local",
@@ -199,6 +216,7 @@ export const seedMantenimiento: Mantenimiento[] = [
 export const seedNoRenovacion: NoRenovacion[] = [
   {
     id: "nr-1",
+    code: "nr-1",
     contratoId: "ctr-2",
     motivo: "Cambio de ciudad por trabajo",
     fechaSolicitud: "2025-05-01",

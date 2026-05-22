@@ -9,13 +9,15 @@ import type { CreateInput, UpdateInput, Usuario } from "@/types";
 import { revalidatePath } from "next/cache";
 
 export async function crearUsuarioAction(data: CreateInput<Usuario>) {
-  await crearUsuario(data);
+  const created = await crearUsuario(data);
   revalidatePath("/usuarios");
+  return created;
 }
 
 export async function actualizarUsuarioAction(id: string, data: UpdateInput<Usuario>) {
-  await actualizarUsuario(id, data);
+  const updated = await actualizarUsuario(id, data);
   revalidatePath("/usuarios");
+  return updated;
 }
 
 export async function eliminarUsuarioAction(id: string) {

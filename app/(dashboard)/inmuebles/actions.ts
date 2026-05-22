@@ -5,20 +5,27 @@ import {
   crearInmueble,
   eliminarInmueble,
 } from "@/services/inmuebles.service";
+import { revalidateInmuebleDependents } from "@/lib/revalidate-paths";
+import { listarInmueblesReferencia } from "@/services/inmuebles.service";
 import type { CreateInput, Inmueble, UpdateInput } from "@/types";
-import { revalidatePath } from "next/cache";
+
+export async function listarInmueblesFormAction() {
+  return listarInmueblesReferencia();
+}
 
 export async function crearInmuebleAction(data: CreateInput<Inmueble>) {
-  await crearInmueble(data);
-  revalidatePath("/inmuebles");
+  const created = await crearInmueble(data);
+  revalidateInmuebleDependents();
+  return created;
 }
 
 export async function actualizarInmuebleAction(id: string, data: UpdateInput<Inmueble>) {
-  await actualizarInmueble(id, data);
-  revalidatePath("/inmuebles");
+  const updated = await actualizarInmueble(id, data);
+  revalidateInmuebleDependents();
+  return updated;
 }
 
 export async function eliminarInmuebleAction(id: string) {
   await eliminarInmueble(id);
-  revalidatePath("/inmuebles");
+  revalidateInmuebleDependents();
 }

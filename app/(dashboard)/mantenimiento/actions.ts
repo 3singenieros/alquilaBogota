@@ -9,13 +9,18 @@ import type { CreateInput, Mantenimiento, UpdateInput } from "@/types";
 import { revalidatePath } from "next/cache";
 
 export async function crearMantenimientoAction(data: CreateInput<Mantenimiento>) {
-  await crearMantenimiento(data);
+  const created = await crearMantenimiento(data);
   revalidatePath("/mantenimiento");
+  return created;
 }
 
-export async function actualizarMantenimientoAction(id: string, data: UpdateInput<Mantenimiento>) {
-  await actualizarMantenimiento(id, data);
+export async function actualizarMantenimientoAction(
+  id: string,
+  data: UpdateInput<Mantenimiento>
+) {
+  const updated = await actualizarMantenimiento(id, data);
   revalidatePath("/mantenimiento");
+  return updated;
 }
 
 export async function eliminarMantenimientoAction(id: string) {

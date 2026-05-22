@@ -5,13 +5,15 @@ import type { CreateInput, PagoReportado, UpdateInput } from "@/types";
 import { revalidatePath } from "next/cache";
 
 export async function crearPagoAction(data: CreateInput<PagoReportado>) {
-  await crearPago(data);
+  const created = await crearPago(data);
   revalidatePath("/pagos");
+  return created;
 }
 
 export async function actualizarPagoAction(id: string, data: UpdateInput<PagoReportado>) {
-  await actualizarPago(id, data);
+  const updated = await actualizarPago(id, data);
   revalidatePath("/pagos");
+  return updated;
 }
 
 export async function eliminarPagoAction(id: string) {

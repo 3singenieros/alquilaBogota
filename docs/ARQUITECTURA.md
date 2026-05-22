@@ -51,6 +51,8 @@ Login obligatorio en `/login` (credenciales mock + cookie `alquila_session`). De
 ## Entidades principales
 `Usuario`, `Inmueble`, `Contrato`, `PagoReportado`, `ServicioPublico`, `Mantenimiento`, `NoRenovacion`
 
+Cada entidad expone `id` (clave técnica) y `code` (código de negocio único, autogenerado en repositorios con prefijos `u-`, `inm-`, `ctr-`, `pag-`, `srv-`, `mnt-`, `nr-`). En formularios de creación no se muestra `code`; en tablas va como primera columna. Los selectores de relación muestran `code — título` (o `code — inmueble — título` en contratos).
+
 ## Decisiones
 - Sin microservicios: todo en monolito Next.js + Supabase.
 - Server Components para listados; Client Components para modales/formularios.

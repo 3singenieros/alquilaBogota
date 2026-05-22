@@ -59,14 +59,13 @@ export function UsuariosModule({
     };
     startTransition(async () => {
       if (editing) {
-        await actualizarUsuarioAction(editing.id, payload);
-        setItems((prev) => prev.map((u) => (u.id === editing.id ? { ...u, ...payload } : u)));
+        const updated = await actualizarUsuarioAction(editing.id, payload);
+        if (updated) {
+          setItems((prev) => prev.map((u) => (u.id === editing.id ? { ...u, ...updated } : u)));
+        }
       } else {
-        await crearUsuarioAction(payload);
-        setItems((prev) => [
-          ...prev,
-          { ...payload, id: `u-${Date.now()}`, creadoEn: new Date().toISOString().slice(0, 10) },
-        ]);
+        const created = await crearUsuarioAction(payload);
+        if (created) setItems((prev) => [...prev, created]);
       }
       setOpen(false);
       setEditing(null);
@@ -97,6 +96,7 @@ export function UsuariosModule({
       <Table>
         <thead>
           <tr>
+            <Th>Código</Th>
             <Th>Nombre</Th>
             <Th>Email</Th>
             <Th>Rol</Th>
@@ -109,6 +109,7 @@ export function UsuariosModule({
         <tbody>
           {filtered.map((u) => (
             <Tr key={u.id}>
+              <Td className="font-mono text-xs text-slate-600">{u.code}</Td>
               <Td className="font-medium">{u.nombre}</Td>
               <Td>{u.email}</Td>
               <Td>

@@ -13,30 +13,47 @@ import { Input } from "@/components/ui/input";
 import { PageHeader } from "@/components/ui/page-header";
 import { Select } from "@/components/ui/select";
 import { Table, Td, Th, Tr } from "@/components/ui/table";
+import { inmuebleOptionLabel, inmueblesById, inmuebleDisplayFromId } from "@/lib/entity-labels";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { getModulePermissions } from "@/lib/auth/permissions";
-import type { Contrato, EstadoContrato, Rol } from "@/types";
+import type { Contrato, EstadoContrato, Inmueble, Rol } from "@/types";
+import { listarInmueblesFormAction } from "@/app/(dashboard)/inmuebles/actions";
 import { Pencil, Plus, Trash2 } from "lucide-react";
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 
 const ESTADOS: EstadoContrato[] = ["ACTIVO", "VENCIDO", "PENDIENTE", "TERMINADO"];
 
 export function ContratosModule({
   initialData,
+  inmuebles,
   rol,
   usuarioId,
 }: {
   initialData: Contrato[];
+  inmuebles: Inmueble[];
   rol: Rol;
   usuarioId: string;
 }) {
   const perms = getModulePermissions(rol, "contratos");
+  const [inmueblesOptions, setInmueblesOptions] = useState(inmuebles);
+  const inmueblesMap = useMemo(() => inmueblesById(inmueblesOptions), [inmueblesOptions]);
   const [items, setItems] = useState(initialData);
   const [search, setSearch] = useState("");
   const [estadoFilter, setEstadoFilter] = useState("");
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Contrato | null>(null);
   const [pending, startTransition] = useTransition();
+
+  useEffect(() => {
+    setInmueblesOptions(inmuebles);
+  }, [inmuebles]);
+
+  async function openForm(editingItem: Contrato | null) {
+    const fresh = await listarInmueblesFormAction();
+    setInmueblesOptions(fresh);
+    setEditing(editingItem);
+    setOpen(true);
+  }
 
   const filtered = useMemo(
     () =>
@@ -64,14 +81,13 @@ export function ContratosModule({
     };
     startTransition(async () => {
       if (editing) {
-        await actualizarContratoAction(editing.id, payload);
-        setItems((prev) => prev.map((i) => (i.id === editing.id ? { ...i, ...payload } : i)));
+        const updated = await actualizarContratoAction(editing.id, payload);
+        if (updated) {
+          setItems((prev) => prev.map((i) => (i.id === editing.id ? { ...i, ...updated } : i)));
+        }
       } else {
-        await crearContratoAction(payload);
-        setItems((prev) => [
-          ...prev,
-          { ...payload, id: `ctr-${Date.now()}`, creadoEn: new Date().toISOString().slice(0, 10) },
-        ]);
+        const created = await crearContratoAction(payload);
+        if (created) setItems((prev) => [...prev, created]);
       }
       setOpen(false);
       setEditing(null);
@@ -85,7 +101,7 @@ export function ContratosModule({
         description="Contratos de arrendamiento — documentos adjuntos, sin firma digital real"
         action={
           perms.canCreate ? (
-            <Button onClick={() => { setEditing(null); setOpen(true); }}>
+            <Button onClick={() => openForm(null)}>
               <Plus className="h-4 w-4" /> Nuevo contrato
             </Button>
           ) : undefined
@@ -101,7 +117,7 @@ export function ContratosModule({
       <Table>
         <thead>
           <tr>
-            <Th>ID</Th>
+            <Th>Código</Th>
             <Th>Inmueble</Th>
             <Th>Vigencia</Th>
             <Th>Canon</Th>
@@ -112,8 +128,8 @@ export function ContratosModule({
         <tbody>
           {filtered.map((c) => (
             <Tr key={c.id}>
-              <Td className="font-mono text-xs">{c.id}</Td>
-              <Td>{c.inmuebleId}</Td>
+              <Td className="font-mono text-xs text-slate-600">{c.code}</Td>
+              <Td>{inmuebleDisplayFromId(c.inmuebleId, inmueblesMap)}</Td>
               <Td>
                 {formatDate(c.fechaInicio)} — {formatDate(c.fechaFin)}
               </Td>
@@ -124,7 +140,7 @@ export function ContratosModule({
               {(perms.canEdit || perms.canDelete) && (
                 <Td className="text-right">
                   {perms.canEdit && (
-                    <Button variant="ghost" size="sm" onClick={() => { setEditing(c); setOpen(true); }}>
+                    <Button variant="ghost" size="sm" onClick={() => openForm(c)}>
                       <Pencil className="h-4 w-4" />
                     </Button>
                   )}
@@ -161,9 +177,24 @@ export function ContratosModule({
           </>
         }
       >
-        <form id="ctr-form" onSubmit={handleSubmit} className="space-y-4">
-          <FormField label="ID Inmueble">
-            <Input name="inmuebleId" defaultValue={editing?.inmuebleId ?? "inm-1"} required />
+        <form
+          id="ctr-form"
+          key={editing?.id ?? `new-${inmueblesOptions.map((i) => i.id).join(",")}`}
+          onSubmit={handleSubmit}
+          className="space-y-4"
+        >
+          <FormField label="Inmueble">
+            <Select
+              name="inmuebleId"
+              defaultValue={editing?.inmuebleId ?? inmueblesOptions[0]?.id}
+              required
+            >
+              {inmueblesOptions.map((inm) => (
+                <option key={inm.id} value={inm.id}>
+                  {inmuebleOptionLabel(inm)}
+                </option>
+              ))}
+            </Select>
           </FormField>
           <div className="grid grid-cols-2 gap-3">
             <FormField label="Inicio">

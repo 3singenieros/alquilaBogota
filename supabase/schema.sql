@@ -6,6 +6,7 @@ create extension if not exists "pgcrypto";
 -- USUARIOS (perfil demo; auth.users se vincula en fase posterior)
 create table if not exists usuarios (
   id uuid primary key default gen_random_uuid(),
+  code text not null unique,
   nombre text not null,
   email text not null unique,
   rol text not null check (rol in ('ADMIN', 'ARRENDADOR', 'ARRENDATARIO')),
@@ -16,6 +17,7 @@ create table if not exists usuarios (
 
 create table if not exists inmuebles (
   id uuid primary key default gen_random_uuid(),
+  code text not null unique,
   titulo text not null,
   direccion text not null,
   ciudad text not null,
@@ -29,6 +31,7 @@ create table if not exists inmuebles (
 
 create table if not exists contratos (
   id uuid primary key default gen_random_uuid(),
+  code text not null unique,
   inmueble_id uuid not null references inmuebles(id) on delete cascade,
   arrendatario_id uuid not null references usuarios(id),
   arrendador_id uuid not null references usuarios(id),
@@ -42,6 +45,7 @@ create table if not exists contratos (
 
 create table if not exists pagos_reportados (
   id uuid primary key default gen_random_uuid(),
+  code text not null unique,
   contrato_id uuid not null references contratos(id) on delete cascade,
   mes text not null,
   monto numeric not null,
@@ -54,6 +58,7 @@ create table if not exists pagos_reportados (
 
 create table if not exists servicios_publicos (
   id uuid primary key default gen_random_uuid(),
+  code text not null unique,
   inmueble_id uuid not null references inmuebles(id) on delete cascade,
   tipo text not null,
   periodo text not null,
@@ -65,6 +70,7 @@ create table if not exists servicios_publicos (
 
 create table if not exists mantenimiento (
   id uuid primary key default gen_random_uuid(),
+  code text not null unique,
   inmueble_id uuid not null references inmuebles(id) on delete cascade,
   titulo text not null,
   descripcion text not null,
@@ -78,6 +84,7 @@ create table if not exists mantenimiento (
 
 create table if not exists no_renovacion (
   id uuid primary key default gen_random_uuid(),
+  code text not null unique,
   contrato_id uuid not null references contratos(id) on delete cascade,
   motivo text not null,
   fecha_solicitud date not null,

@@ -65,20 +65,15 @@ export function InmueblesModule({
 
     startTransition(async () => {
       if (editing) {
-        await actualizarInmuebleAction(editing.id, payload);
-        setItems((prev) =>
-          prev.map((i) => (i.id === editing.id ? { ...i, ...payload } : i))
-        );
+        const updated = await actualizarInmuebleAction(editing.id, payload);
+        if (updated) {
+          setItems((prev) =>
+            prev.map((i) => (i.id === editing.id ? { ...i, ...updated } : i))
+          );
+        }
       } else {
-        await crearInmuebleAction(payload);
-        setItems((prev) => [
-          ...prev,
-          {
-            ...payload,
-            id: `inm-${Date.now()}`,
-            creadoEn: new Date().toISOString().slice(0, 10),
-          },
-        ]);
+        const created = await crearInmuebleAction(payload);
+        if (created) setItems((prev) => [...prev, created]);
       }
       setOpen(false);
       setEditing(null);
@@ -125,6 +120,7 @@ export function InmueblesModule({
       <Table>
         <thead>
           <tr>
+            <Th>Código</Th>
             <Th>Título</Th>
             <Th>Ciudad</Th>
             <Th>Tipo</Th>
@@ -138,6 +134,7 @@ export function InmueblesModule({
         <tbody>
           {filtered.map((i) => (
             <Tr key={i.id}>
+              <Td className="font-mono text-xs text-slate-600">{i.code}</Td>
               <Td className="font-medium text-slate-900">{i.titulo}</Td>
               <Td>{i.ciudad}</Td>
               <Td>{i.tipo}</Td>

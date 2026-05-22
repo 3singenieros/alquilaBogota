@@ -1,6 +1,8 @@
 import { seedNoRenovacion } from "@/data/mock/seed";
+import { ENTITY_CODE_PREFIX, generateUniqueCode } from "@/lib/entity-codes";
+import { buildMockEntity } from "@/lib/mock-create";
 import { getSupabaseClient } from "@/lib/supabase/client";
-import { createMockStore, newId } from "@/repositories/mock-store";
+import { createMockStore } from "@/repositories/mock-store";
 import type { CreateInput, NoRenovacion, UpdateInput } from "@/types";
 
 export interface NoRenovacionRepository {
@@ -16,7 +18,14 @@ const mockStore = createMockStore(seedNoRenovacion);
 export const noRenovacionMockRepository: NoRenovacionRepository = {
   findAll: async () => mockStore.getAll(),
   findById: async (id) => mockStore.getById(id),
-  create: async (data) => mockStore.create({ ...data, id: newId("nr") }),
+  create: async (data) => {
+    const item = buildMockEntity<NoRenovacion>(
+      ENTITY_CODE_PREFIX.noRenovacion,
+      data,
+      mockStore.getAll()
+    );
+    return mockStore.create(item);
+  },
   update: async (id, data) => mockStore.update(id, data),
   delete: async (id) => mockStore.remove(id),
 };
@@ -38,7 +47,16 @@ export const noRenovacionSupabaseRepository: NoRenovacionRepository = {
   create: async (input) => {
     const sb = getSupabaseClient();
     if (!sb) throw new Error("Supabase no configurado");
-    const { data, error } = await sb.from("no_renovacion").insert(toRow(input)).select().single();
+    const { data: existing } = await sb.from("no_renovacion").select("code");
+    const code = generateUniqueCode(
+      ENTITY_CODE_PREFIX.noRenovacion,
+      (existing ?? []).map((r) => r.code as string)
+    );
+    const { data, error } = await sb
+      .from("no_renovacion")
+      .insert({ ...toRow(input), code })
+      .select()
+      .single();
     if (error) throw error;
     return mapRow(data);
   },
@@ -59,6 +77,7 @@ export const noRenovacionSupabaseRepository: NoRenovacionRepository = {
 function mapRow(r: Record<string, unknown>): NoRenovacion {
   return {
     id: r.id as string,
+    code: r.code as string,
     contratoId: r.contrato_id as string,
     motivo: r.motivo as string,
     fechaSolicitud: r.fecha_solicitud as string,
