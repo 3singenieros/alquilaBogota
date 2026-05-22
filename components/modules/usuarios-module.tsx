@@ -13,13 +13,21 @@ import { Input } from "@/components/ui/input";
 import { PageHeader } from "@/components/ui/page-header";
 import { Select } from "@/components/ui/select";
 import { Table, Td, Th, Tr } from "@/components/ui/table";
+import { getModulePermissions } from "@/lib/auth/permissions";
 import type { Rol, Usuario } from "@/types";
 import { Pencil, Plus, Trash2 } from "lucide-react";
 import { useMemo, useState, useTransition } from "react";
 
 const ROLES: Rol[] = ["ADMIN", "ARRENDADOR", "ARRENDATARIO"];
 
-export function UsuariosModule({ initialData }: { initialData: Usuario[] }) {
+export function UsuariosModule({
+  initialData,
+  rol,
+}: {
+  initialData: Usuario[];
+  rol: Rol;
+}) {
+  const perms = getModulePermissions(rol, "usuarios");
   const [items, setItems] = useState(initialData);
   const [search, setSearch] = useState("");
   const [rolFilter, setRolFilter] = useState("");
@@ -71,9 +79,11 @@ export function UsuariosModule({ initialData }: { initialData: Usuario[] }) {
         title="Usuarios y roles"
         description="Gestión de usuarios — auth real vía Supabase en fase posterior"
         action={
-          <Button onClick={() => { setEditing(null); setOpen(true); }}>
-            <Plus className="h-4 w-4" /> Nuevo usuario
-          </Button>
+          perms.canCreate ? (
+            <Button onClick={() => { setEditing(null); setOpen(true); }}>
+              <Plus className="h-4 w-4" /> Nuevo usuario
+            </Button>
+          ) : undefined
         }
       />
       <FilterBar
@@ -91,7 +101,9 @@ export function UsuariosModule({ initialData }: { initialData: Usuario[] }) {
             <Th>Email</Th>
             <Th>Rol</Th>
             <Th>Estado</Th>
-            <Th className="text-right">Acciones</Th>
+            {(perms.canEdit || perms.canDelete) && (
+              <Th className="text-right">Acciones</Th>
+            )}
           </tr>
         </thead>
         <tbody>
@@ -108,25 +120,31 @@ export function UsuariosModule({ initialData }: { initialData: Usuario[] }) {
               <Td>
                 <StatusBadge label={u.activo ? "Activo" : "Inactivo"} variant={u.activo ? "success" : "danger"} />
               </Td>
-              <Td className="text-right">
-                <Button variant="ghost" size="sm" onClick={() => { setEditing(u); setOpen(true); }}>
-                  <Pencil className="h-4 w-4" />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => {
-                    if (confirm("¿Eliminar usuario?")) {
-                      startTransition(async () => {
-                        await eliminarUsuarioAction(u.id);
-                        setItems((p) => p.filter((x) => x.id !== u.id));
-                      });
-                    }
-                  }}
-                >
-                  <Trash2 className="h-4 w-4 text-red-500" />
-                </Button>
-              </Td>
+              {(perms.canEdit || perms.canDelete) && (
+                <Td className="text-right">
+                  {perms.canEdit && (
+                    <Button variant="ghost" size="sm" onClick={() => { setEditing(u); setOpen(true); }}>
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                  )}
+                  {perms.canDelete && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        if (confirm("¿Eliminar usuario?")) {
+                          startTransition(async () => {
+                            await eliminarUsuarioAction(u.id);
+                            setItems((p) => p.filter((x) => x.id !== u.id));
+                          });
+                        }
+                      }}
+                    >
+                      <Trash2 className="h-4 w-4 text-red-500" />
+                    </Button>
+                  )}
+                </Td>
+              )}
             </Tr>
           ))}
         </tbody>

@@ -14,13 +14,23 @@ import { PageHeader } from "@/components/ui/page-header";
 import { Select } from "@/components/ui/select";
 import { Table, Td, Th, Tr } from "@/components/ui/table";
 import { formatCurrency } from "@/lib/utils";
-import type { EstadoInmueble, Inmueble } from "@/types";
+import { getModulePermissions } from "@/lib/auth/permissions";
+import type { EstadoInmueble, Inmueble, Rol } from "@/types";
 import { Pencil, Plus, Trash2 } from "lucide-react";
 import { useMemo, useState, useTransition } from "react";
 
 const ESTADOS: EstadoInmueble[] = ["DISPONIBLE", "ARRENDADO", "MANTENIMIENTO"];
 
-export function InmueblesModule({ initialData }: { initialData: Inmueble[] }) {
+export function InmueblesModule({
+  initialData,
+  rol,
+  usuarioId,
+}: {
+  initialData: Inmueble[];
+  rol: Rol;
+  usuarioId: string;
+}) {
+  const perms = getModulePermissions(rol, "inmuebles");
   const [items, setItems] = useState(initialData);
   const [search, setSearch] = useState("");
   const [estadoFilter, setEstadoFilter] = useState("");
@@ -49,7 +59,7 @@ export function InmueblesModule({ initialData }: { initialData: Inmueble[] }) {
       tipo: fd.get("tipo") as string,
       estado: fd.get("estado") as EstadoInmueble,
       canonMensual: Number(fd.get("canonMensual")),
-      arrendadorId: "u-arrendador",
+      arrendadorId: usuarioId,
       descripcion: (fd.get("descripcion") as string) || undefined,
     };
 
@@ -89,15 +99,17 @@ export function InmueblesModule({ initialData }: { initialData: Inmueble[] }) {
         title="Inmuebles"
         description="Gestión de propiedades en arrendamiento activo"
         action={
-          <Button
-            onClick={() => {
-              setEditing(null);
-              setOpen(true);
-            }}
-          >
-            <Plus className="h-4 w-4" />
-            Nuevo inmueble
-          </Button>
+          perms.canCreate ? (
+            <Button
+              onClick={() => {
+                setEditing(null);
+                setOpen(true);
+              }}
+            >
+              <Plus className="h-4 w-4" />
+              Nuevo inmueble
+            </Button>
+          ) : undefined
         }
       />
 
@@ -118,7 +130,9 @@ export function InmueblesModule({ initialData }: { initialData: Inmueble[] }) {
             <Th>Tipo</Th>
             <Th>Canon</Th>
             <Th>Estado</Th>
-            <Th className="text-right">Acciones</Th>
+            {(perms.canEdit || perms.canDelete) && (
+              <Th className="text-right">Acciones</Th>
+            )}
           </tr>
         </thead>
         <tbody>
@@ -131,23 +145,29 @@ export function InmueblesModule({ initialData }: { initialData: Inmueble[] }) {
               <Td>
                 <StatusBadge label={i.estado} variant={estadoVariant(i.estado)} />
               </Td>
-              <Td className="text-right">
-                <div className="flex justify-end gap-1">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => {
-                      setEditing(i);
-                      setOpen(true);
-                    }}
-                  >
-                    <Pencil className="h-4 w-4" />
-                  </Button>
-                  <Button variant="ghost" size="sm" onClick={() => handleDelete(i.id)}>
-                    <Trash2 className="h-4 w-4 text-red-500" />
-                  </Button>
-                </div>
-              </Td>
+              {(perms.canEdit || perms.canDelete) && (
+                <Td className="text-right">
+                  <div className="flex justify-end gap-1">
+                    {perms.canEdit && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          setEditing(i);
+                          setOpen(true);
+                        }}
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                    )}
+                    {perms.canDelete && (
+                      <Button variant="ghost" size="sm" onClick={() => handleDelete(i.id)}>
+                        <Trash2 className="h-4 w-4 text-red-500" />
+                      </Button>
+                    )}
+                  </div>
+                </Td>
+              )}
             </Tr>
           ))}
         </tbody>

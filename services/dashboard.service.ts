@@ -1,41 +1,61 @@
 import { seedActividad, seedIncidencias } from "@/data/mock/seed";
+import { loadAuthContext } from "@/lib/auth/load-context";
 import {
-  getContratosRepository,
-  getInmueblesRepository,
-  getMantenimientoRepository,
-  getPagosRepository,
-} from "@/repositories";
+  filterContratos,
+  filterInmuebles,
+  filterMantenimiento,
+  filterPagos,
+} from "@/lib/auth/scopes";
+import { assertModuleAccess, requireSession } from "@/services/auth.service";
+import { getMantenimientoRepository, getPagosRepository } from "@/repositories";
+import type { Rol } from "@/types";
+
+const ACTIVIDAD_POR_ROL: Record<Rol, string[]> = {
+  ADMIN: ["Pagos", "Mantenimiento", "Contratos", "Servicios públicos", "No renovación"],
+  ARRENDADOR: ["Pagos", "Mantenimiento", "Contratos"],
+  ARRENDATARIO: ["Pagos", "Mantenimiento", "No renovación"],
+};
 
 export async function getDashboardResumen() {
-  const [inmuebles, contratos, pagos, mantenimiento] = await Promise.all([
-    getInmueblesRepository().findAll(),
-    getContratosRepository().findAll(),
+  const { usuario } = await requireSession();
+  assertModuleAccess(usuario.rol, "dashboard");
+
+  const { contratos, inmuebles } = await loadAuthContext();
+  const inmueblesScope = filterInmuebles(inmuebles, usuario);
+  const contratosScope = filterContratos(contratos, usuario);
+  const [pagosAll, mantenimientoAll] = await Promise.all([
     getPagosRepository().findAll(),
     getMantenimientoRepository().findAll(),
   ]);
+  const pagos = filterPagos(pagosAll, usuario, contratos);
+  const mantenimiento = filterMantenimiento(mantenimientoAll, usuario, inmuebles);
 
-  const contratosActivos = contratos.filter((c) => c.estado === "ACTIVO").length;
+  const contratosActivos = contratosScope.filter((c) => c.estado === "ACTIVO").length;
   const pagosPendientes = pagos.filter((p) => p.estado === "REPORTADO").length;
   const mantenimientoAbierto = mantenimiento.filter(
     (m) => m.estado === "ABIERTO" || m.estado === "EN_PROGRESO"
   ).length;
 
   return {
-    totalInmuebles: inmuebles.length,
-    inmueblesArrendados: inmuebles.filter((i) => i.estado === "ARRENDADO").length,
+    totalInmuebles: inmueblesScope.length,
+    inmueblesArrendados: inmueblesScope.filter((i) => i.estado === "ARRENDADO").length,
     contratosActivos,
     pagosPendientes,
     mantenimientoAbierto,
-    ingresosEstimados: contratos
+    ingresosEstimados: contratosScope
       .filter((c) => c.estado === "ACTIVO")
       .reduce((sum, c) => sum + c.canonMensual, 0),
   };
 }
 
 export async function getActividadReciente() {
-  return seedActividad;
+  const { usuario } = await requireSession();
+  const modulos = ACTIVIDAD_POR_ROL[usuario.rol];
+  return seedActividad.filter((a) => modulos.includes(a.modulo));
 }
 
 export async function getIncidencias() {
-  return seedIncidencias;
+  const { usuario } = await requireSession();
+  const modulos = ACTIVIDAD_POR_ROL[usuario.rol];
+  return seedIncidencias.filter((i) => modulos.includes(i.modulo));
 }

@@ -40,10 +40,13 @@ flowchart LR
 3. `USE_MOCK_DATA=false` en entorno.
 4. Opcional: ejecutar `supabase/seed.sql` para datos demo.
 
-## Roles
+## Autenticación y roles
+
+Login obligatorio en `/login` (credenciales mock + cookie `alquila_session`). Detalle en [AUTENTICACION.md](./AUTENTICACION.md).
+
 - **ADMIN**: visión global, usuarios, todos los módulos.
-- **ARRENDADOR**: inmuebles propios, contratos, pagos, servicios, mantenimiento.
-- **ARRENDATARIO**: pagos reportados, mantenimiento, no renovación (solicitudes).
+- **ARRENDADOR**: inmuebles propios, contratos, pagos, servicios, mantenimiento, no renovación.
+- **ARRENDATARIO**: dashboard reducido, pagos reportados, mantenimiento, no renovación.
 
 ## Entidades principales
 `Usuario`, `Inmueble`, `Contrato`, `PagoReportado`, `ServicioPublico`, `Mantenimiento`, `NoRenovacion`

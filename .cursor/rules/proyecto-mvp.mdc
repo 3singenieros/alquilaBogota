@@ -13,7 +13,7 @@ alwaysApply: true
 ## Límites funcionales
 - NO procesar pagos reales: solo **pagos reportados** con comprobante.
 - NO firma digital real: solo adjuntar documentos.
-- Sin autenticación real al inicio: usuarios mock por rol (ADMIN, ARRENDADOR, ARRENDATARIO).
+- Login obligatorio con credenciales mock; sesión en cookie firmada; autorización por rol en middleware y services (ver docs/AUTENTICACION.md).
 
 ## Módulos obligatorios
 Dashboard, Inmuebles, Contratos, Pagos reportados, Servicios públicos, Mantenimiento, No renovación, Usuarios y roles.

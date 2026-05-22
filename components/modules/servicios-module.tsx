@@ -10,13 +10,21 @@ import { PageHeader } from "@/components/ui/page-header";
 import { Select } from "@/components/ui/select";
 import { Table, Td, Th, Tr } from "@/components/ui/table";
 import { formatCurrency, formatDate } from "@/lib/utils";
-import type { EstadoServicio, ServicioPublico } from "@/types";
+import { getModulePermissions } from "@/lib/auth/permissions";
+import type { EstadoServicio, Rol, ServicioPublico } from "@/types";
 import { Plus } from "lucide-react";
 import { useMemo, useState, useTransition } from "react";
 
 const ESTADOS: EstadoServicio[] = ["PENDIENTE", "PAGADO", "VENCIDO"];
 
-export function ServiciosModule({ initialData }: { initialData: ServicioPublico[] }) {
+export function ServiciosModule({
+  initialData,
+  rol,
+}: {
+  initialData: ServicioPublico[];
+  rol: Rol;
+}) {
+  const perms = getModulePermissions(rol, "servicios");
   const [items, setItems] = useState(initialData);
   const [search, setSearch] = useState("");
   const [estadoFilter, setEstadoFilter] = useState("");
@@ -56,7 +64,13 @@ export function ServiciosModule({ initialData }: { initialData: ServicioPublico[
       <PageHeader
         title="Servicios públicos"
         description="Control de facturas de servicios por inmueble"
-        action={<Button onClick={() => setOpen(true)}><Plus className="h-4 w-4" /> Registrar</Button>}
+        action={
+          perms.canCreate ? (
+            <Button onClick={() => setOpen(true)}>
+              <Plus className="h-4 w-4" /> Registrar
+            </Button>
+          ) : undefined
+        }
       />
       <FilterBar
         search={search}

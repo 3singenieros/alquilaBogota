@@ -7,13 +7,26 @@ import { Button } from "@/components/ui/button";
 import { FormField, Modal } from "@/components/ui/modal";
 import { Input } from "@/components/ui/input";
 import { PageHeader } from "@/components/ui/page-header";
+import { Select } from "@/components/ui/select";
 import { Table, Td, Th, Tr } from "@/components/ui/table";
+import { getModulePermissions } from "@/lib/auth/permissions";
 import { formatDate } from "@/lib/utils";
-import type { NoRenovacion } from "@/types";
+import type { Contrato, NoRenovacion, Rol } from "@/types";
 import { Plus } from "lucide-react";
 import { useMemo, useState, useTransition } from "react";
 
-export function NoRenovacionModule({ initialData }: { initialData: NoRenovacion[] }) {
+export function NoRenovacionModule({
+  initialData,
+  contratos,
+  rol,
+  usuarioId,
+}: {
+  initialData: NoRenovacion[];
+  contratos: Contrato[];
+  rol: Rol;
+  usuarioId: string;
+}) {
+  const perms = getModulePermissions(rol, "no-renovacion");
   const [items, setItems] = useState(initialData);
   const [search, setSearch] = useState("");
   const [estadoFilter, setEstadoFilter] = useState("");
@@ -38,7 +51,7 @@ export function NoRenovacionModule({ initialData }: { initialData: NoRenovacion[
       motivo: fd.get("motivo") as string,
       fechaSolicitud: new Date().toISOString().slice(0, 10),
       estado: "SOLICITADA" as const,
-      solicitadoPorId: "u-arrendatario",
+      solicitadoPorId: usuarioId,
     };
     startTransition(async () => {
       await crearNoRenovacionAction(payload);
@@ -52,7 +65,13 @@ export function NoRenovacionModule({ initialData }: { initialData: NoRenovacion[
       <PageHeader
         title="No renovación"
         description="Solicitudes de terminación sin renovación del contrato"
-        action={<Button onClick={() => setOpen(true)}><Plus className="h-4 w-4" /> Nueva solicitud</Button>}
+        action={
+          perms.canCreate ? (
+            <Button onClick={() => setOpen(true)}>
+              <Plus className="h-4 w-4" /> Nueva solicitud
+            </Button>
+          ) : undefined
+        }
       />
       <FilterBar
         search={search}
@@ -79,7 +98,7 @@ export function NoRenovacionModule({ initialData }: { initialData: NoRenovacion[
           {filtered.map((n) => (
             <Tr key={n.id}>
               <Td>{n.contratoId}</Td>
-              <Td className="max-w-xs truncate">{n.motivo}</Td>
+              <Td>{n.motivo}</Td>
               <Td>{formatDate(n.fechaSolicitud)}</Td>
               <Td>
                 <StatusBadge label={n.estado} variant={estadoVariant(n.estado)} />
@@ -91,17 +110,31 @@ export function NoRenovacionModule({ initialData }: { initialData: NoRenovacion[
       <Modal
         open={open}
         onClose={() => setOpen(false)}
-        title="Solicitar no renovación"
+        title="Solicitud de no renovación"
         footer={
           <>
-            <Button variant="secondary" onClick={() => setOpen(false)}>Cancelar</Button>
-            <Button type="submit" form="nr-form" disabled={pending}>Enviar</Button>
+            <Button variant="secondary" onClick={() => setOpen(false)}>
+              Cancelar
+            </Button>
+            <Button type="submit" form="nr-form" disabled={pending}>
+              Enviar
+            </Button>
           </>
         }
       >
         <form id="nr-form" onSubmit={handleSubmit} className="space-y-4">
-          <FormField label="ID Contrato"><Input name="contratoId" defaultValue="ctr-2" required /></FormField>
-          <FormField label="Motivo"><Input name="motivo" required /></FormField>
+          <FormField label="Contrato">
+            <Select name="contratoId" defaultValue={contratos[0]?.id} required>
+              {contratos.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.id} — {c.inmuebleId}
+                </option>
+              ))}
+            </Select>
+          </FormField>
+          <FormField label="Motivo">
+            <Input name="motivo" required />
+          </FormField>
         </form>
       </Modal>
     </>

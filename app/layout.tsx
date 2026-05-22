@@ -13,8 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Gestión de Arrendamientos | MVP",
-  description: "Prototipo académico de gestión de arrendamientos activos",
+  title: "AlquilaBogotá | Gestión de arrendamientos",
+  description: "Prototipo académico de gestión de arrendamientos activos en Bogotá",
 };
 
 export default function RootLayout({

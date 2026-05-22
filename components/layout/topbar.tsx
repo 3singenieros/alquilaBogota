@@ -1,13 +1,17 @@
 "use client";
 
-import { useRole } from "@/components/providers/role-provider";
-import { Select } from "@/components/ui/select";
-import { Menu, Search } from "lucide-react";
-import type { Rol } from "@/types";
+import { logoutAction } from "@/app/login/actions";
+import { Button } from "@/components/ui/button";
+import type { Usuario } from "@/types";
+import { LogOut, Menu, Search } from "lucide-react";
 
-export function Topbar({ onMenuClick }: { onMenuClick: () => void }) {
-  const { rol, usuario, setRol } = useRole();
-
+export function Topbar({
+  onMenuClick,
+  usuario,
+}: {
+  onMenuClick: () => void;
+  usuario: Usuario;
+}) {
   return (
     <header className="sticky top-0 z-30 flex h-16 items-center gap-4 border-b border-[var(--border)] bg-white/80 px-4 backdrop-blur md:px-6">
       <button
@@ -23,21 +27,11 @@ export function Topbar({ onMenuClick }: { onMenuClick: () => void }) {
         <input
           placeholder="Buscar inmuebles, contratos..."
           className="w-full rounded-lg border border-[var(--border)] bg-slate-50 py-2 pl-10 pr-4 text-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+          disabled
+          title="Búsqueda global — pendiente de implementación"
         />
       </div>
       <div className="ml-auto flex items-center gap-3">
-        <div className="hidden sm:block">
-          <label className="sr-only">Rol demo</label>
-          <Select
-            value={rol}
-            onChange={(e) => setRol(e.target.value as Rol)}
-            className="w-40"
-          >
-            <option value="ADMIN">ADMIN</option>
-            <option value="ARRENDADOR">ARRENDADOR</option>
-            <option value="ARRENDATARIO">ARRENDATARIO</option>
-          </Select>
-        </div>
         <div className="flex items-center gap-2 rounded-lg bg-slate-50 px-3 py-2">
           <div className="flex h-8 w-8 items-center justify-center rounded-full bg-indigo-100 text-sm font-semibold text-indigo-700">
             {usuario.nombre.charAt(0)}
@@ -47,6 +41,12 @@ export function Topbar({ onMenuClick }: { onMenuClick: () => void }) {
             <p className="text-xs text-slate-500">{usuario.rol}</p>
           </div>
         </div>
+        <form action={logoutAction}>
+          <Button type="submit" variant="secondary" size="sm" title="Cerrar sesión">
+            <LogOut className="h-4 w-4" />
+            <span className="hidden sm:inline">Salir</span>
+          </Button>
+        </form>
       </div>
     </header>
   );

@@ -1,9 +1,10 @@
 "use client";
 
+import { NAV_ITEMS } from "@/lib/auth/permissions";
 import { cn } from "@/lib/utils";
+import type { Rol } from "@/types";
 import {
   Building2,
-  ClipboardList,
   FileText,
   Hammer,
   LayoutDashboard,
@@ -12,28 +13,32 @@ import {
   XCircle,
   Zap,
 } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-const nav = [
-  { href: "/", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/inmuebles", label: "Inmuebles", icon: Building2 },
-  { href: "/contratos", label: "Contratos", icon: FileText },
-  { href: "/pagos", label: "Pagos reportados", icon: Receipt },
-  { href: "/servicios", label: "Servicios públicos", icon: Zap },
-  { href: "/mantenimiento", label: "Mantenimiento", icon: Hammer },
-  { href: "/no-renovacion", label: "No renovación", icon: XCircle },
-  { href: "/usuarios", label: "Usuarios y roles", icon: Users },
-];
+const ICONS: Record<string, LucideIcon> = {
+  "/": LayoutDashboard,
+  "/inmuebles": Building2,
+  "/contratos": FileText,
+  "/pagos": Receipt,
+  "/servicios": Zap,
+  "/mantenimiento": Hammer,
+  "/no-renovacion": XCircle,
+  "/usuarios": Users,
+};
 
 export function Sidebar({
   open,
   onClose,
+  rol,
 }: {
   open: boolean;
   onClose: () => void;
+  rol: Rol;
 }) {
   const pathname = usePathname();
+  const nav = NAV_ITEMS.filter((item) => item.roles.includes(rol));
 
   return (
     <>
@@ -51,16 +56,17 @@ export function Sidebar({
       >
         <div className="flex h-16 items-center gap-2 border-b border-[var(--border)] px-5">
           <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-indigo-600 text-white">
-            <ClipboardList className="h-5 w-5" />
+            <span className="text-sm font-bold">AB</span>
           </div>
           <div>
-            <p className="text-sm font-bold text-slate-900">Arriendos</p>
-            <p className="text-xs text-slate-500">MVP Académico</p>
+            <p className="text-sm font-bold text-slate-900">AlquilaBogotá</p>
+            <p className="text-xs text-slate-500">MVP académico</p>
           </div>
         </div>
         <nav className="flex-1 space-y-1 p-3">
-          {nav.map(({ href, label, icon: Icon }) => {
+          {nav.map(({ href, label }) => {
             const active = pathname === href;
+            const Icon = ICONS[href] ?? LayoutDashboard;
             return (
               <Link
                 key={href}
@@ -80,7 +86,7 @@ export function Sidebar({
           })}
         </nav>
         <div className="border-t border-[var(--border)] p-4 text-xs text-slate-500">
-          Prototipo tesis — datos demo
+          Sesión: {rol}
         </div>
       </aside>
     </>

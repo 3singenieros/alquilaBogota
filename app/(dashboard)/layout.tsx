@@ -1,14 +1,12 @@
 import { AppShell } from "@/components/layout/app-shell";
-import { RoleProvider } from "@/components/providers/role-provider";
+import { requireSession } from "@/services/auth.service";
 
-export default function DashboardLayout({
+export default async function DashboardLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  return (
-    <RoleProvider>
-      <AppShell>{children}</AppShell>
-    </RoleProvider>
-  );
+  const session = await requireSession();
+
+  return <AppShell usuario={session.usuario}>{children}</AppShell>;
 }

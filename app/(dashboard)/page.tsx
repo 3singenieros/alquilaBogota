@@ -5,6 +5,8 @@ import {
   getDashboardResumen,
   getIncidencias,
 } from "@/services/dashboard.service";
+import { requireSession } from "@/services/auth.service";
+import type { Rol } from "@/types";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import {
   AlertTriangle,
@@ -14,15 +16,26 @@ import {
   Receipt,
 } from "lucide-react";
 
+const STATS_BY_ROL: Record<
+  Rol,
+  Array<"inmuebles" | "contratos" | "pagos" | "mantenimiento">
+> = {
+  ADMIN: ["inmuebles", "contratos", "pagos", "mantenimiento"],
+  ARRENDADOR: ["inmuebles", "contratos", "pagos", "mantenimiento"],
+  ARRENDATARIO: ["pagos", "mantenimiento"],
+};
+
 export default async function DashboardPage() {
+  const session = await requireSession();
   const [resumen, actividad, incidencias] = await Promise.all([
     getDashboardResumen(),
     getActividadReciente(),
     getIncidencias(),
   ]);
 
-  const stats = [
+  const allStats = [
     {
+      key: "inmuebles" as const,
       label: "Inmuebles",
       value: resumen.totalInmuebles,
       sub: `${resumen.inmueblesArrendados} arrendados`,
@@ -30,6 +43,7 @@ export default async function DashboardPage() {
       color: "text-indigo-600 bg-indigo-50",
     },
     {
+      key: "contratos" as const,
       label: "Contratos activos",
       value: resumen.contratosActivos,
       sub: "Vigentes",
@@ -37,6 +51,7 @@ export default async function DashboardPage() {
       color: "text-emerald-600 bg-emerald-50",
     },
     {
+      key: "pagos" as const,
       label: "Pagos por validar",
       value: resumen.pagosPendientes,
       sub: "Reportados",
@@ -44,6 +59,7 @@ export default async function DashboardPage() {
       color: "text-amber-600 bg-amber-50",
     },
     {
+      key: "mantenimiento" as const,
       label: "Mantenimiento abierto",
       value: resumen.mantenimientoAbierto,
       sub: "Incidencias",
@@ -52,12 +68,15 @@ export default async function DashboardPage() {
     },
   ];
 
+  const allowed = STATS_BY_ROL[session.usuario.rol];
+  const stats = allStats.filter((s) => allowed.includes(s.key));
+
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-slate-900">Dashboard</h1>
         <p className="text-sm text-slate-500">
-          Resumen de arrendamientos activos — prototipo académico
+          Resumen para {session.usuario.nombre} ({session.usuario.rol})
         </p>
       </div>
 
@@ -78,14 +97,16 @@ export default async function DashboardPage() {
         ))}
       </div>
 
-      <Card>
-        <CardContent className="py-4">
-          <p className="text-sm text-slate-500">Ingresos estimados (cánones activos)</p>
-          <p className="text-2xl font-bold text-indigo-600">
-            {formatCurrency(resumen.ingresosEstimados)}
-          </p>
-        </CardContent>
-      </Card>
+      {session.usuario.rol !== "ARRENDATARIO" && (
+        <Card>
+          <CardContent className="py-4">
+            <p className="text-sm text-slate-500">Ingresos estimados (cánones activos)</p>
+            <p className="text-2xl font-bold text-indigo-600">
+              {formatCurrency(resumen.ingresosEstimados)}
+            </p>
+          </CardContent>
+        </Card>
+      )}
 
       <div className="grid gap-6 lg:grid-cols-2">
         <Card>

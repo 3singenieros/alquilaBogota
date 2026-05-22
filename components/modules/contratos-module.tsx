@@ -14,13 +14,23 @@ import { PageHeader } from "@/components/ui/page-header";
 import { Select } from "@/components/ui/select";
 import { Table, Td, Th, Tr } from "@/components/ui/table";
 import { formatCurrency, formatDate } from "@/lib/utils";
-import type { Contrato, EstadoContrato } from "@/types";
+import { getModulePermissions } from "@/lib/auth/permissions";
+import type { Contrato, EstadoContrato, Rol } from "@/types";
 import { Pencil, Plus, Trash2 } from "lucide-react";
 import { useMemo, useState, useTransition } from "react";
 
 const ESTADOS: EstadoContrato[] = ["ACTIVO", "VENCIDO", "PENDIENTE", "TERMINADO"];
 
-export function ContratosModule({ initialData }: { initialData: Contrato[] }) {
+export function ContratosModule({
+  initialData,
+  rol,
+  usuarioId,
+}: {
+  initialData: Contrato[];
+  rol: Rol;
+  usuarioId: string;
+}) {
+  const perms = getModulePermissions(rol, "contratos");
   const [items, setItems] = useState(initialData);
   const [search, setSearch] = useState("");
   const [estadoFilter, setEstadoFilter] = useState("");
@@ -44,8 +54,8 @@ export function ContratosModule({ initialData }: { initialData: Contrato[] }) {
     const fd = new FormData(e.currentTarget);
     const payload = {
       inmuebleId: fd.get("inmuebleId") as string,
-      arrendatarioId: "u-arrendatario",
-      arrendadorId: "u-arrendador",
+      arrendatarioId: (fd.get("arrendatarioId") as string) || "u-arrendatario",
+      arrendadorId: usuarioId,
       fechaInicio: fd.get("fechaInicio") as string,
       fechaFin: fd.get("fechaFin") as string,
       canonMensual: Number(fd.get("canonMensual")),
@@ -74,9 +84,11 @@ export function ContratosModule({ initialData }: { initialData: Contrato[] }) {
         title="Contratos"
         description="Contratos de arrendamiento — documentos adjuntos, sin firma digital real"
         action={
-          <Button onClick={() => { setEditing(null); setOpen(true); }}>
-            <Plus className="h-4 w-4" /> Nuevo contrato
-          </Button>
+          perms.canCreate ? (
+            <Button onClick={() => { setEditing(null); setOpen(true); }}>
+              <Plus className="h-4 w-4" /> Nuevo contrato
+            </Button>
+          ) : undefined
         }
       />
       <FilterBar
@@ -94,7 +106,7 @@ export function ContratosModule({ initialData }: { initialData: Contrato[] }) {
             <Th>Vigencia</Th>
             <Th>Canon</Th>
             <Th>Estado</Th>
-            <Th className="text-right">Acciones</Th>
+            {(perms.canEdit || perms.canDelete) && <Th className="text-right">Acciones</Th>}
           </tr>
         </thead>
         <tbody>
@@ -109,25 +121,31 @@ export function ContratosModule({ initialData }: { initialData: Contrato[] }) {
               <Td>
                 <StatusBadge label={c.estado} variant={estadoVariant(c.estado)} />
               </Td>
-              <Td className="text-right">
-                <Button variant="ghost" size="sm" onClick={() => { setEditing(c); setOpen(true); }}>
-                  <Pencil className="h-4 w-4" />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => {
-                    if (confirm("¿Eliminar?")) {
-                      startTransition(async () => {
-                        await eliminarContratoAction(c.id);
-                        setItems((p) => p.filter((x) => x.id !== c.id));
-                      });
-                    }
-                  }}
-                >
-                  <Trash2 className="h-4 w-4 text-red-500" />
-                </Button>
-              </Td>
+              {(perms.canEdit || perms.canDelete) && (
+                <Td className="text-right">
+                  {perms.canEdit && (
+                    <Button variant="ghost" size="sm" onClick={() => { setEditing(c); setOpen(true); }}>
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                  )}
+                  {perms.canDelete && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        if (confirm("¿Eliminar?")) {
+                          startTransition(async () => {
+                            await eliminarContratoAction(c.id);
+                            setItems((p) => p.filter((x) => x.id !== c.id));
+                          });
+                        }
+                      }}
+                    >
+                      <Trash2 className="h-4 w-4 text-red-500" />
+                    </Button>
+                  )}
+                </Td>
+              )}
             </Tr>
           ))}
         </tbody>

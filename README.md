@@ -17,7 +17,17 @@ npm install
 npm run dev
 ```
 
-Abre [http://localhost:3000](http://localhost:3000). Cambia el rol demo desde el selector del topbar (ADMIN / ARRENDADOR / ARRENDATARIO).
+Abre [http://localhost:3000](http://localhost:3000). Serás redirigido a **/login**.
+
+Credenciales demo (ver también `docs/AUTENTICACION.md`):
+
+| Usuario | Contraseña |
+|---------|------------|
+| `admin` | `admin123` |
+| `arrendador` | `arrendador123` |
+| `arrendatario` | `arrendatario123` |
+
+Copia `.env.example` → `.env.local` y define `SESSION_SECRET` antes de iniciar sesión.
 
 ## Estructura
 
@@ -53,3 +63,4 @@ Ver `.cursor/rules/` — prioridad MVP, sin pagos reales, sin firma digital, cap
 ## Documentación
 
 - [docs/ARQUITECTURA.md](docs/ARQUITECTURA.md)
+- [docs/AUTENTICACION.md](docs/AUTENTICACION.md)

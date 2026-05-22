@@ -1,9 +1,7 @@
 "use client";
 
 import {
-  actualizarPagoAction,
   crearPagoAction,
-  eliminarPagoAction,
 } from "@/app/(dashboard)/pagos/actions";
 import { FilterBar } from "@/components/shared/filter-bar";
 import { StatusBadge, estadoVariant } from "@/components/ui/badge";
@@ -13,14 +11,26 @@ import { Input } from "@/components/ui/input";
 import { PageHeader } from "@/components/ui/page-header";
 import { Select } from "@/components/ui/select";
 import { Table, Td, Th, Tr } from "@/components/ui/table";
+import { getModulePermissions } from "@/lib/auth/permissions";
 import { formatCurrency, formatDate } from "@/lib/utils";
-import type { EstadoPago, PagoReportado } from "@/types";
+import type { Contrato, EstadoPago, PagoReportado, Rol } from "@/types";
 import { Plus } from "lucide-react";
 import { useMemo, useState, useTransition } from "react";
 
 const ESTADOS: EstadoPago[] = ["REPORTADO", "VALIDADO", "RECHAZADO"];
 
-export function PagosModule({ initialData }: { initialData: PagoReportado[] }) {
+export function PagosModule({
+  initialData,
+  contratos,
+  rol,
+  usuarioId,
+}: {
+  initialData: PagoReportado[];
+  contratos: Contrato[];
+  rol: Rol;
+  usuarioId: string;
+}) {
+  const perms = getModulePermissions(rol, "pagos");
   const [items, setItems] = useState(initialData);
   const [search, setSearch] = useState("");
   const [estadoFilter, setEstadoFilter] = useState("");
@@ -47,7 +57,7 @@ export function PagosModule({ initialData }: { initialData: PagoReportado[] }) {
       fechaReporte: new Date().toISOString().slice(0, 10),
       estado: "REPORTADO" as EstadoPago,
       comprobanteUrl: (fd.get("comprobanteUrl") as string) || undefined,
-      reportadoPorId: "u-arrendatario",
+      reportadoPorId: usuarioId,
       notas: (fd.get("notas") as string) || undefined,
     };
     startTransition(async () => {
@@ -63,9 +73,11 @@ export function PagosModule({ initialData }: { initialData: PagoReportado[] }) {
         title="Pagos reportados"
         description="Registro de pagos con comprobante — no procesamiento de pagos reales"
         action={
-          <Button onClick={() => setOpen(true)}>
-            <Plus className="h-4 w-4" /> Reportar pago
-          </Button>
+          perms.canCreate ? (
+            <Button onClick={() => setOpen(true)}>
+              <Plus className="h-4 w-4" /> Reportar pago
+            </Button>
+          ) : undefined
         }
       />
       <FilterBar
@@ -114,8 +126,14 @@ export function PagosModule({ initialData }: { initialData: PagoReportado[] }) {
         }
       >
         <form id="pago-form" onSubmit={handleSubmit} className="space-y-4">
-          <FormField label="ID Contrato">
-            <Input name="contratoId" defaultValue="ctr-1" required />
+          <FormField label="Contrato">
+            <Select name="contratoId" defaultValue={contratos[0]?.id} required>
+              {contratos.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.id} — {c.inmuebleId}
+                </option>
+              ))}
+            </Select>
           </FormField>
           <FormField label="Mes (YYYY-MM)">
             <Input name="mes" defaultValue="2025-06" required />
