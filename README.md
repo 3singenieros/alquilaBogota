@@ -1,4 +1,6 @@
-# Gestión de Arrendamientos — MVP Académico
+# AlquilaBogotá — Gestión de Arrendamientos (MVP Académico)
+
+Repositorio: [github.com/3singenieros/alquilaBogota](https://github.com/3singenieros/alquilaBogota)
 
 Prototipo para tesis de Ingeniería de Software. Gestiona **arrendamientos ya activos** (no marketplace).
 
