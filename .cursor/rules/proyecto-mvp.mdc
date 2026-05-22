@@ -1,0 +1,37 @@
+---
+description: Reglas del prototipo académico de gestión de arrendamientos
+alwaysApply: true
+---
+
+# Prototipo MVP — Gestión de Arrendamientos
+
+## Propósito
+- Prototipo académico para tesis de Ingeniería de Software.
+- Priorizar velocidad, claridad y demostrabilidad sobre arquitectura empresarial.
+- Gestiona arrendamientos **ya activos**. NO es marketplace.
+
+## Límites funcionales
+- NO procesar pagos reales: solo **pagos reportados** con comprobante.
+- NO firma digital real: solo adjuntar documentos.
+- Sin autenticación real al inicio: usuarios mock por rol (ADMIN, ARRENDADOR, ARRENDATARIO).
+
+## Módulos obligatorios
+Dashboard, Inmuebles, Contratos, Pagos reportados, Servicios públicos, Mantenimiento, No renovación, Usuarios y roles.
+
+## Capas (obligatorio)
+- `/types` — modelos TypeScript
+- `/lib` — utilidades, cliente Supabase, config
+- `/repositories` o `/data` — acceso a datos (mock o Supabase)
+- `/services` — lógica de negocio; los componentes NO acceden a datos directamente
+- `/components` — UI
+- `/app` — rutas App Router
+
+## Persistencia
+- Iniciar con mock; arquitectura lista para Supabase (auth, DB, storage).
+- Variables en `.env.local`; nunca commitear secretos.
+- CRUD vía repositorios; carga de archivos vía Supabase Storage cuando esté activo.
+
+## UI
+- Tailwind, estilo SaaS/dashboard moderno.
+- Tablas con filtros, badges de estado, modales crear/editar.
+- Sin microservicios ni backend complejo fuera de Supabase.

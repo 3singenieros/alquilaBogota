@@ -1,0 +1,35 @@
+---
+description: Separación de capas de datos y UI
+globs: "{app,components,services,repositories,lib}/**/*.{ts,tsx}"
+alwaysApply: false
+---
+
+# Capas de datos
+
+## Prohibido en componentes visuales
+- Consultas directas a Supabase
+- Arrays mock inline en páginas
+- Lógica de negocio compleja en JSX
+
+## Flujo correcto
+```
+Page/Client → service → repository → (mock | Supabase)
+```
+
+## Repositorios
+- Una interfaz por entidad.
+- Implementación `*MockRepository` y `*SupabaseRepository`.
+- Factory en `repositories/index.ts` según `USE_MOCK_DATA`.
+
+## Servicios
+- Orquestan repositorios, validaciones ligeras y mapeo para UI.
+- Exportar funciones usadas por Server Actions y Server Components.
+
+## Ejemplo
+```typescript
+// ❌ En page.tsx
+const data = mockInmuebles.filter(...)
+
+// ✅ En page.tsx
+const data = await inmueblesService.listar(filtros)
+```
