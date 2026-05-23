@@ -14,6 +14,7 @@ import {
   Zap,
   Bell,
   Inbox,
+  History,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import Link from "next/link";
@@ -30,6 +31,7 @@ const ICONS: Record<string, LucideIcon> = {
   "/notificaciones": Bell,
   "/solicitudes-contrato": Inbox,
   "/usuarios": Users,
+  "/trazabilidad": History,
 };
 
 function navLabel(href: string, label: string, rolActivo: Rol): string {

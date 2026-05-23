@@ -1,7 +1,14 @@
 "use client";
 
-import { listarInmueblesFormAction } from "@/app/(dashboard)/inmuebles/actions";
-import { crearMantenimientoAction } from "@/app/(dashboard)/mantenimiento/actions";
+import {
+  actualizarContenidoMantenimientoAction,
+  agregarComentarioMantenimientoAction,
+  cambiarEstadoMantenimientoAction,
+  crearMantenimientoAction,
+  listarInmueblesMantenimientoFormAction,
+} from "@/app/(dashboard)/mantenimiento/actions";
+import { listarHistorialMantenimientoAction } from "@/app/(dashboard)/trazabilidad/actions";
+import { HistorialTimeline } from "@/components/trazabilidad/historial-timeline";
 import { SimulatedFileInput } from "@/components/shared/simulated-file-input";
 import { FilterBar } from "@/components/shared/filter-bar";
 import { StatusBadge, estadoVariant } from "@/components/ui/badge";
@@ -13,42 +20,95 @@ import { Select } from "@/components/ui/select";
 import { Table, Td, Th, Tr } from "@/components/ui/table";
 import { inmuebleDisplayFromId, inmuebleOptionLabel, inmueblesById } from "@/lib/entity-labels";
 import { getModulePermissions } from "@/lib/auth/permissions";
+import {
+  ESTADOS_MANTENIMIENTO,
+  MENSAJE_EDICION_BLOQUEADA,
+  arrendatarioPuedeEditarSolicitud,
+  arrendadorPuedeGestionarEstado,
+  puedeAgregarComentario,
+} from "@/lib/mantenimiento-reglas";
 import { formatDate } from "@/lib/utils";
-import type { EstadoMantenimiento, Inmueble, Mantenimiento, Rol } from "@/types";
-import { Plus } from "lucide-react";
+import type {
+  ComentarioMantenimiento,
+  EstadoMantenimiento,
+  Inmueble,
+  Mantenimiento,
+  Rol,
+} from "@/types";
+import type { EventoTrazabilidad } from "@/types/trazabilidad";
+import {
+  Eye,
+  GitBranch,
+  History,
+  MessageSquare,
+  Pencil,
+  Plus,
+} from "lucide-react";
 import { useEffect, useMemo, useState, useTransition } from "react";
 
-const ESTADOS: EstadoMantenimiento[] = ["ABIERTO", "EN_PROGRESO", "RESUELTO", "CERRADO"];
+function puedeEditarContenido(
+  m: Mantenimiento,
+  rol: Rol,
+  usuarioId: string
+): boolean {
+  if (rol === "ADMIN") return true;
+  if (rol === "ARRENDATARIO") {
+    return (
+      m.solicitadoPorId === usuarioId && arrendatarioPuedeEditarSolicitud(m.estado)
+    );
+  }
+  return false;
+}
 
 export function MantenimientoModule({
   initialData,
+  initialComentarios,
   inmuebles,
   rol,
   usuarioId,
 }: {
   initialData: Mantenimiento[];
+  initialComentarios: ComentarioMantenimiento[];
   inmuebles: Inmueble[];
   rol: Rol;
   usuarioId: string;
 }) {
   const perms = getModulePermissions(rol, "mantenimiento");
+  const canManageEstado = arrendadorPuedeGestionarEstado(rol);
+
   const [inmueblesOptions, setInmueblesOptions] = useState(inmuebles);
   const inmueblesMap = useMemo(() => inmueblesById(inmueblesOptions), [inmueblesOptions]);
   const [items, setItems] = useState(initialData);
+  const [comentarios, setComentarios] = useState(initialComentarios);
   const [search, setSearch] = useState("");
   const [estadoFilter, setEstadoFilter] = useState("");
   const [open, setOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
+  const [estadoOpen, setEstadoOpen] = useState(false);
+  const [comentarioOpen, setComentarioOpen] = useState(false);
+  const [detailOpen, setDetailOpen] = useState(false);
+  const [historialOpen, setHistorialOpen] = useState(false);
+  const [selected, setSelected] = useState<Mantenimiento | null>(null);
+  const [historialEventos, setHistorialEventos] = useState<EventoTrazabilidad[]>([]);
+  const [formError, setFormError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
   useEffect(() => {
     setInmueblesOptions(inmuebles);
   }, [inmuebles]);
 
-  async function openForm() {
-    const fresh = await listarInmueblesFormAction();
-    setInmueblesOptions(fresh);
-    setOpen(true);
-  }
+  const comentariosPorTicket = useMemo(() => {
+    const map = new Map<string, ComentarioMantenimiento[]>();
+    for (const c of comentarios) {
+      const list = map.get(c.mantenimientoId) ?? [];
+      list.push(c);
+      map.set(c.mantenimientoId, list);
+    }
+    for (const [, list] of map) {
+      list.sort((a, b) => a.fechaCreacion.localeCompare(b.fechaCreacion));
+    }
+    return map;
+  }, [comentarios]);
 
   const filtered = useMemo(
     () =>
@@ -60,9 +120,29 @@ export function MantenimientoModule({
     [items, search, estadoFilter]
   );
 
-  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+  async function openCreateForm() {
+    setFormError(null);
+    const fresh = await listarInmueblesMantenimientoFormAction();
+    setInmueblesOptions(fresh);
+    if (fresh.length === 0) {
+      setFormError(
+        rol === "ARRENDATARIO"
+          ? "No tienes un contrato confirmado con inmueble asociado para solicitar mantenimiento."
+          : "No hay inmuebles disponibles para registrar mantenimiento."
+      );
+    }
+    setOpen(true);
+  }
+
+  async function handleCreate(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    const fd = new FormData(e.currentTarget);
+    setFormError(null);
+    if (inmueblesOptions.length === 0) {
+      setFormError("Selecciona un inmueble válido (contrato confirmado).");
+      return;
+    }
+    const form = e.currentTarget;
+    const fd = new FormData(form);
     const payload = {
       inmuebleId: fd.get("inmuebleId") as string,
       titulo: fd.get("titulo") as string,
@@ -73,32 +153,135 @@ export function MantenimientoModule({
       adjuntoUrl: (fd.get("adjuntoUrl") as string) || undefined,
     };
     startTransition(async () => {
-      const created = await crearMantenimientoAction(payload);
-      if (created) setItems((prev) => [...prev, created]);
-      setOpen(false);
+      try {
+        const created = await crearMantenimientoAction(payload);
+        if (created) {
+          setItems((prev) => [...prev, created]);
+          setOpen(false);
+          form.reset();
+        }
+      } catch (err) {
+        setFormError(err instanceof Error ? err.message : "No se pudo crear la solicitud");
+      }
     });
   }
+
+  async function handleUpdateContenido(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    if (!selected) return;
+    setFormError(null);
+    const fd = new FormData(e.currentTarget);
+    const payload: Partial<Mantenimiento> = {
+      titulo: fd.get("titulo") as string,
+      descripcion: fd.get("descripcion") as string,
+      prioridad: fd.get("prioridad") as Mantenimiento["prioridad"],
+      adjuntoUrl: (fd.get("adjuntoUrl") as string) || selected.adjuntoUrl,
+    };
+    startTransition(async () => {
+      try {
+        const updated = await actualizarContenidoMantenimientoAction(selected.id, payload);
+        if (updated) {
+          setItems((prev) => prev.map((m) => (m.id === selected.id ? { ...m, ...updated } : m)));
+          setSelected(updated);
+          setEditOpen(false);
+        }
+      } catch (err) {
+        setFormError(err instanceof Error ? err.message : "No se pudo actualizar");
+      }
+    });
+  }
+
+  async function handleCambioEstado(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    if (!selected) return;
+    setFormError(null);
+    const fd = new FormData(e.currentTarget);
+    const estado = fd.get("estado") as EstadoMantenimiento;
+    const motivoRechazo = (fd.get("motivoRechazo") as string) || undefined;
+    startTransition(async () => {
+      try {
+        const updated = await cambiarEstadoMantenimientoAction(selected.id, {
+          estado,
+          asignadoA: (fd.get("asignadoA") as string) || undefined,
+          observacionesGestion: (fd.get("observacionesGestion") as string) || undefined,
+          motivoRechazo,
+        });
+        if (updated) {
+          setItems((prev) => prev.map((m) => (m.id === selected.id ? { ...m, ...updated } : m)));
+          setSelected(updated);
+          setEstadoOpen(false);
+        }
+      } catch (err) {
+        setFormError(err instanceof Error ? err.message : "No se pudo cambiar el estado");
+      }
+    });
+  }
+
+  async function handleComentario(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    if (!selected) return;
+    setFormError(null);
+    const fd = new FormData(e.currentTarget);
+    startTransition(async () => {
+      try {
+        const created = await agregarComentarioMantenimientoAction(selected.id, {
+          comentario: fd.get("comentario") as string,
+          adjuntoUrl: (fd.get("adjuntoUrl") as string) || undefined,
+        });
+        if (created) {
+          setComentarios((prev) => [...prev, created]);
+          setComentarioOpen(false);
+        }
+      } catch (err) {
+        setFormError(err instanceof Error ? err.message : "No se pudo agregar el comentario");
+      }
+    });
+  }
+
+  async function verHistorial(m: Mantenimiento) {
+    const eventos = await listarHistorialMantenimientoAction(m.id);
+    setHistorialEventos(eventos);
+    setSelected(m);
+    setHistorialOpen(true);
+  }
+
+  function selectTicket(m: Mantenimiento) {
+    setSelected(m);
+    setFormError(null);
+  }
+
+  const editDisabledReason =
+    rol === "ARRENDATARIO" && selected && !arrendatarioPuedeEditarSolicitud(selected.estado)
+      ? MENSAJE_EDICION_BLOQUEADA
+      : undefined;
 
   return (
     <>
       <PageHeader
         title="Mantenimiento"
-        description="Solicitudes e incidencias de mantenimiento"
+        description={
+          rol === "ARRENDATARIO"
+            ? "Reporta incidencias del inmueble que arriendas"
+            : "Gestiona solicitudes de mantenimiento de tus inmuebles"
+        }
         action={
           perms.canCreate ? (
-            <Button onClick={() => openForm()}>
+            <Button onClick={() => openCreateForm()}>
               <Plus className="h-4 w-4" /> Nueva solicitud
             </Button>
           ) : undefined
         }
       />
+
       <FilterBar
         search={search}
         onSearchChange={setSearch}
         estado={estadoFilter}
         onEstadoChange={setEstadoFilter}
-        estados={ESTADOS.map((e) => ({ value: e, label: e }))}
+        estados={ESTADOS_MANTENIMIENTO.map((e) => ({ value: e, label: e }))}
+        placeholder="Buscar por título..."
       />
+
       <Table>
         <thead>
           <tr>
@@ -107,77 +290,430 @@ export function MantenimientoModule({
             <Th>Inmueble</Th>
             <Th>Prioridad</Th>
             <Th>Estado</Th>
+            <Th>Asignado a</Th>
             <Th>Fecha</Th>
+            <Th className="text-right">Acciones</Th>
           </tr>
         </thead>
         <tbody>
-          {filtered.map((m) => (
-            <Tr key={m.id}>
-              <Td className="font-mono text-xs text-slate-600">{m.code}</Td>
-              <Td className="font-medium">{m.titulo}</Td>
-              <Td>{inmuebleDisplayFromId(m.inmuebleId, inmueblesMap)}</Td>
-              <Td>
-                <StatusBadge
-                  label={m.prioridad}
-                  variant={
-                    m.prioridad === "ALTA"
-                      ? "danger"
-                      : m.prioridad === "MEDIA"
-                        ? "warning"
-                        : "neutral"
-                  }
-                />
+          {filtered.length === 0 ? (
+            <tr>
+              <Td colSpan={8} className="text-center text-sm text-slate-500">
+                No hay solicitudes de mantenimiento.
               </Td>
-              <Td>
-                <StatusBadge label={m.estado} variant={estadoVariant(m.estado)} />
-              </Td>
-              <Td>{formatDate(m.creadoEn)}</Td>
-            </Tr>
-          ))}
+            </tr>
+          ) : (
+            filtered.map((m) => {
+              const editContent = puedeEditarContenido(m, rol, usuarioId);
+              const editBlocked =
+                rol === "ARRENDATARIO" && !arrendatarioPuedeEditarSolicitud(m.estado);
+              const canComment = puedeAgregarComentario(rol, m.estado);
+              return (
+                <Tr key={m.id}>
+                  <Td className="font-mono text-xs text-slate-600">{m.code}</Td>
+                  <Td className="font-medium">{m.titulo}</Td>
+                  <Td>{inmuebleDisplayFromId(m.inmuebleId, inmueblesMap)}</Td>
+                  <Td>
+                    <StatusBadge
+                      label={m.prioridad}
+                      variant={
+                        m.prioridad === "ALTA"
+                          ? "danger"
+                          : m.prioridad === "MEDIA"
+                            ? "warning"
+                            : "neutral"
+                      }
+                    />
+                  </Td>
+                  <Td>
+                    <StatusBadge label={m.estado} variant={estadoVariant(m.estado)} />
+                  </Td>
+                  <Td className="text-xs text-slate-600">{m.asignadoA ?? "—"}</Td>
+                  <Td>{formatDate(m.creadoEn)}</Td>
+                  <Td className="text-right">
+                    <div className="flex flex-wrap justify-end gap-1">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        title="Ver detalle"
+                        onClick={() => {
+                          selectTicket(m);
+                          setDetailOpen(true);
+                        }}
+                      >
+                        <Eye className="h-4 w-4" />
+                      </Button>
+                      {(rol === "ADMIN" ||
+                        (rol === "ARRENDATARIO" && m.solicitadoPorId === usuarioId)) && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          title={
+                            editBlocked
+                              ? MENSAJE_EDICION_BLOQUEADA
+                              : "Editar solicitud"
+                          }
+                          disabled={editBlocked || !editContent}
+                          onClick={() => {
+                            selectTicket(m);
+                            setEditOpen(true);
+                          }}
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                      )}
+                      {canComment && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          title="Agregar comentario"
+                          onClick={() => {
+                            selectTicket(m);
+                            setComentarioOpen(true);
+                          }}
+                        >
+                          <MessageSquare className="h-4 w-4" />
+                        </Button>
+                      )}
+                      {canManageEstado && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          title="Cambiar estado"
+                          onClick={() => {
+                            selectTicket(m);
+                            setEstadoOpen(true);
+                          }}
+                        >
+                          <GitBranch className="h-4 w-4" />
+                        </Button>
+                      )}
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        title="Histórico"
+                        onClick={() => verHistorial(m)}
+                      >
+                        <History className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </Td>
+                </Tr>
+              );
+            })
+          )}
         </tbody>
       </Table>
+
       <Modal
         open={open}
-        onClose={() => setOpen(false)}
+        onClose={() => {
+          setOpen(false);
+          setFormError(null);
+        }}
         title="Nueva solicitud de mantenimiento"
         footer={
           <>
             <Button variant="secondary" onClick={() => setOpen(false)}>
               Cancelar
             </Button>
-            <Button type="submit" form="mnt-form" disabled={pending}>
+            <Button
+              type="submit"
+              form="mnt-create-form"
+              disabled={pending || inmueblesOptions.length === 0}
+            >
               Guardar
             </Button>
           </>
         }
       >
-        <form id="mnt-form" onSubmit={handleSubmit} className="space-y-4">
-          <FormField label="Inmueble">
-            <Select name="inmuebleId" defaultValue={inmueblesOptions[0]?.id} required>
-              {inmueblesOptions.map((inm) => (
-                <option key={inm.id} value={inm.id}>
-                  {inmuebleOptionLabel(inm)}
-                </option>
-              ))}
-            </Select>
-          </FormField>
-          <FormField label="Título">
-            <Input name="titulo" required />
-          </FormField>
-          <FormField label="Descripción">
-            <Input name="descripcion" required />
-          </FormField>
-          <FormField label="Prioridad">
-            <Select name="prioridad" defaultValue="MEDIA">
-              <option value="BAJA">BAJA</option>
-              <option value="MEDIA">MEDIA</option>
-              <option value="ALTA">ALTA</option>
-            </Select>
-          </FormField>
-          <FormField label="Evidencia adjunta">
-            <SimulatedFileInput name="adjuntoUrl" label="Foto o documento (simulado)" />
-          </FormField>
-        </form>
+        {formError && (
+          <p className="mb-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+            {formError}
+          </p>
+        )}
+        {inmueblesOptions.length === 0 ? (
+          <p className="text-sm text-slate-600">{formError}</p>
+        ) : (
+          <form id="mnt-create-form" onSubmit={handleCreate} className="space-y-4">
+            <FormField label="Inmueble">
+              <Select name="inmuebleId" defaultValue={inmueblesOptions[0]?.id} required>
+                {inmueblesOptions.map((inm) => (
+                  <option key={inm.id} value={inm.id}>
+                    {inmuebleOptionLabel(inm)}
+                  </option>
+                ))}
+              </Select>
+            </FormField>
+            <FormField label="Título">
+              <Input name="titulo" required />
+            </FormField>
+            <FormField label="Descripción">
+              <Input name="descripcion" required />
+            </FormField>
+            <FormField label="Prioridad">
+              <Select name="prioridad" defaultValue="MEDIA">
+                <option value="BAJA">BAJA</option>
+                <option value="MEDIA">MEDIA</option>
+                <option value="ALTA">ALTA</option>
+              </Select>
+            </FormField>
+            <FormField label="Evidencia adjunta">
+              <SimulatedFileInput name="adjuntoUrl" label="Foto o documento (simulado)" />
+            </FormField>
+          </form>
+        )}
+      </Modal>
+
+      <Modal
+        open={editOpen}
+        onClose={() => {
+          setEditOpen(false);
+          setFormError(null);
+        }}
+        title={`Editar solicitud — ${selected?.code ?? ""}`}
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setEditOpen(false)}>
+              Cancelar
+            </Button>
+            <Button
+              type="submit"
+              form="mnt-edit-form"
+              disabled={pending || !!editDisabledReason}
+            >
+              Guardar cambios
+            </Button>
+          </>
+        }
+      >
+        {editDisabledReason && (
+          <p className="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+            {editDisabledReason}
+          </p>
+        )}
+        {formError && (
+          <p className="mb-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+            {formError}
+          </p>
+        )}
+        {selected && !editDisabledReason && (
+          <form id="mnt-edit-form" onSubmit={handleUpdateContenido} className="space-y-4">
+            <FormField label="Título">
+              <Input name="titulo" defaultValue={selected.titulo} required />
+            </FormField>
+            <FormField label="Descripción">
+              <Input name="descripcion" defaultValue={selected.descripcion} required />
+            </FormField>
+            <FormField label="Prioridad">
+              <Select name="prioridad" defaultValue={selected.prioridad}>
+                <option value="BAJA">BAJA</option>
+                <option value="MEDIA">MEDIA</option>
+                <option value="ALTA">ALTA</option>
+              </Select>
+            </FormField>
+            <FormField label="Evidencia">
+              <SimulatedFileInput
+                name="adjuntoUrl"
+                label="Actualizar evidencia (simulado)"
+                defaultValue={selected.adjuntoUrl}
+              />
+            </FormField>
+          </form>
+        )}
+      </Modal>
+
+      <Modal
+        open={estadoOpen}
+        onClose={() => {
+          setEstadoOpen(false);
+          setFormError(null);
+        }}
+        title={`Cambiar estado — ${selected?.code ?? ""}`}
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setEstadoOpen(false)}>
+              Cancelar
+            </Button>
+            <Button type="submit" form="mnt-estado-form" disabled={pending}>
+              Aplicar
+            </Button>
+          </>
+        }
+      >
+        {formError && (
+          <p className="mb-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+            {formError}
+          </p>
+        )}
+        {selected && (
+          <form id="mnt-estado-form" onSubmit={handleCambioEstado} className="space-y-4">
+            <p className="text-sm text-slate-600">
+              Estado actual: <strong>{selected.estado}</strong>
+            </p>
+            <FormField label="Nuevo estado">
+              <Select name="estado" defaultValue={selected.estado} required>
+                {ESTADOS_MANTENIMIENTO.map((e) => (
+                  <option key={e} value={e}>
+                    {e}
+                  </option>
+                ))}
+              </Select>
+            </FormField>
+            <FormField label="Asignado a (proveedor)">
+              <Input name="asignadoA" defaultValue={selected.asignadoA} />
+            </FormField>
+            <FormField label="Observaciones de gestión">
+              <Input
+                name="observacionesGestion"
+                defaultValue={selected.observacionesGestion}
+              />
+            </FormField>
+            <FormField label="Motivo de rechazo (si aplica RECHAZADO)">
+              <Input name="motivoRechazo" placeholder="Obligatorio al rechazar" />
+            </FormField>
+          </form>
+        )}
+      </Modal>
+
+      <Modal
+        open={comentarioOpen}
+        onClose={() => {
+          setComentarioOpen(false);
+          setFormError(null);
+        }}
+        title={`Comentario — ${selected?.code ?? ""}`}
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setComentarioOpen(false)}>
+              Cancelar
+            </Button>
+            <Button type="submit" form="mnt-comentario-form" disabled={pending}>
+              Publicar
+            </Button>
+          </>
+        }
+      >
+        {formError && (
+          <p className="mb-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+            {formError}
+          </p>
+        )}
+        {selected && (
+          <form id="mnt-comentario-form" onSubmit={handleComentario} className="space-y-4">
+            <FormField label="Comentario">
+              <Input name="comentario" required placeholder="Actualización o consulta" />
+            </FormField>
+            <FormField label="Adjunto (opcional)">
+              <SimulatedFileInput name="adjuntoUrl" label="Archivo simulado" />
+            </FormField>
+          </form>
+        )}
+      </Modal>
+
+      <Modal
+        open={detailOpen}
+        onClose={() => setDetailOpen(false)}
+        title={selected?.titulo ?? "Detalle"}
+        footer={
+          <Button variant="secondary" onClick={() => setDetailOpen(false)}>
+            Cerrar
+          </Button>
+        }
+      >
+        {selected && (
+          <div className="space-y-4 text-sm">
+            <dl className="grid gap-2 sm:grid-cols-2">
+              <div>
+                <dt className="text-slate-500">Código</dt>
+                <dd className="font-mono">{selected.code}</dd>
+              </div>
+              <div>
+                <dt className="text-slate-500">Inmueble</dt>
+                <dd>{inmuebleDisplayFromId(selected.inmuebleId, inmueblesMap)}</dd>
+              </div>
+              <div className="sm:col-span-2">
+                <dt className="text-slate-500">Descripción (solicitud original)</dt>
+                <dd>{selected.descripcion}</dd>
+              </div>
+              <div>
+                <dt className="text-slate-500">Estado</dt>
+                <dd>
+                  <StatusBadge label={selected.estado} variant={estadoVariant(selected.estado)} />
+                </dd>
+              </div>
+              <div>
+                <dt className="text-slate-500">Prioridad</dt>
+                <dd>{selected.prioridad}</dd>
+              </div>
+              {selected.asignadoA && (
+                <div>
+                  <dt className="text-slate-500">Asignado a</dt>
+                  <dd>{selected.asignadoA}</dd>
+                </div>
+              )}
+              {selected.observacionesGestion && (
+                <div className="sm:col-span-2">
+                  <dt className="text-slate-500">Observaciones de gestión</dt>
+                  <dd>{selected.observacionesGestion}</dd>
+                </div>
+              )}
+              {selected.adjuntoUrl && (
+                <div className="sm:col-span-2">
+                  <dt className="text-slate-500">Evidencia</dt>
+                  <dd className="font-mono text-xs">{selected.adjuntoUrl}</dd>
+                </div>
+              )}
+            </dl>
+
+            <div>
+              <h4 className="mb-2 font-medium text-slate-800">Comentarios</h4>
+              {(comentariosPorTicket.get(selected.id) ?? []).length === 0 ? (
+                <p className="text-slate-500">Sin comentarios aún.</p>
+              ) : (
+                <ul className="space-y-2">
+                  {(comentariosPorTicket.get(selected.id) ?? []).map((c) => (
+                    <li
+                      key={c.id}
+                      className="rounded-lg border border-[var(--border)] bg-slate-50 p-3"
+                    >
+                      <p className="text-xs text-slate-500">
+                        {c.usuarioNombre} ({c.usuarioRol}) ·{" "}
+                        {formatDate(c.fechaCreacion.slice(0, 10))}
+                      </p>
+                      <p className="mt-1">{c.comentario}</p>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+
+            <div>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-indigo-600"
+                onClick={() => verHistorial(selected)}
+              >
+                <History className="mr-1 h-4 w-4" />
+                Ver historial completo
+              </Button>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      <Modal
+        open={historialOpen}
+        onClose={() => setHistorialOpen(false)}
+        title={`Historial — ${selected?.code ?? ""}`}
+        footer={
+          <Button variant="secondary" onClick={() => setHistorialOpen(false)}>
+            Cerrar
+          </Button>
+        }
+      >
+        <HistorialTimeline eventos={historialEventos} />
       </Modal>
     </>
   );

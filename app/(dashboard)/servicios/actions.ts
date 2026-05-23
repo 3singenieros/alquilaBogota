@@ -1,29 +1,47 @@
 "use server";
 
 import {
-  actualizarServicio,
-  crearServicio,
-  eliminarServicio,
-} from "@/services/servicios.service";
-import type { CreateInput, ServicioPublico, UpdateInput } from "@/types";
+  listarPagosServicio,
+  rechazarPagoServicio,
+  reportarPagoServicio,
+  validarPagoServicio,
+} from "@/services/pagos-servicio.service";
+import { listarServiciosContrato } from "@/services/servicios-contrato.service";
 import { revalidatePath } from "next/cache";
 
-export async function crearServicioAction(data: CreateInput<ServicioPublico>) {
-  const created = await crearServicio(data);
+export async function listarServiciosContratoAction(contratoId?: string) {
+  return listarServiciosContrato(contratoId);
+}
+
+export async function reportarPagoServicioAction(input: {
+  servicioPublicoContratoId: string;
+  periodo: string;
+  fechaPago: string;
+  valorPagado: number;
+  comprobanteUrl?: string;
+  fechaVencimiento?: string;
+  observaciones?: string;
+}) {
+  const created = await reportarPagoServicio(input);
   revalidatePath("/servicios");
+  revalidatePath("/");
   return created;
 }
 
-export async function actualizarServicioAction(
-  id: string,
-  data: UpdateInput<ServicioPublico>
-) {
-  const updated = await actualizarServicio(id, data);
+export async function validarPagoServicioAction(id: string, observaciones?: string) {
+  const updated = await validarPagoServicio(id, observaciones);
   revalidatePath("/servicios");
+  revalidatePath("/");
   return updated;
 }
 
-export async function eliminarServicioAction(id: string) {
-  await eliminarServicio(id);
+export async function rechazarPagoServicioAction(id: string, motivoRechazo: string) {
+  const updated = await rechazarPagoServicio(id, motivoRechazo);
   revalidatePath("/servicios");
+  revalidatePath("/");
+  return updated;
+}
+
+export async function listarPagosServicioAction() {
+  return listarPagosServicio();
 }

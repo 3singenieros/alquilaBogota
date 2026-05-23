@@ -1,3 +1,7 @@
+import { getAuditActor, SYSTEM_ACTOR } from "@/lib/audit/actor";
+import { auditActorFromUsuario } from "@/lib/audit/actor";
+import { inferirContextoTrazabilidad } from "@/lib/audit/context";
+import { traceCambioEstado, traceEvento } from "@/lib/audit/trace-helper";
 import { assertModuleAccess, requireSession } from "@/services/auth.service";
 import { getNotificacionesRepository } from "@/repositories";
 import type { CreateInput, Notificacion, Rol } from "@/types";
@@ -30,21 +34,54 @@ type NotificacionInput = Omit<Notificacion, "id" | "estado" | "fechaCreacion"> &
   Partial<Pick<Notificacion, "estado" | "fechaCreacion" | "contratoId" | "fechaEnvioSimulado">>;
 
 export async function registrarNotificacion(data: NotificacionInput) {
-  return getNotificacionesRepository().create({
+  const created = await getNotificacionesRepository().create({
     ...data,
     estado: data.estado ?? "PENDIENTE",
     fechaCreacion: data.fechaCreacion ?? new Date().toISOString().slice(0, 10),
   } as CreateInput<Notificacion>);
+
+  const actor = (await getAuditActor()) ?? SYSTEM_ACTOR;
+  const ctx = await inferirContextoTrazabilidad("NOTIFICACION", created.id, {
+    contratoId: data.contratoId,
+  });
+  await traceEvento(actor, {
+    entidadTipo: "NOTIFICACION",
+    entidadId: created.id,
+    accion: "NOTIFICACION_CREADA",
+    descripcion: `${data.asunto} → ${data.destinatarioEmail}`,
+    estadoNuevo: created.estado,
+    contexto: ctx,
+    metadata: { tipo: data.tipo },
+  });
+
+  return created;
 }
 
 export async function simularEnvioNotificacion(id: string) {
   const { usuario } = await requireSession();
   assertModuleAccess(usuario.rol, "notificaciones");
+  const existing = await getNotificacionesRepository().findById(id);
   const now = new Date().toISOString();
-  return getNotificacionesRepository().update(id, {
+  const updated = await getNotificacionesRepository().update(id, {
     estado: "SIMULADA",
     fechaEnvioSimulado: now,
   });
+  if (updated && existing) {
+    const actor = auditActorFromUsuario(usuario);
+    const ctx = await inferirContextoTrazabilidad("NOTIFICACION", id, {
+      contratoId: existing.contratoId,
+    });
+    await traceCambioEstado(actor, {
+      entidadTipo: "NOTIFICACION",
+      entidadId: id,
+      estadoAnterior: existing.estado,
+      estadoNuevo: "SIMULADA",
+      descripcion: `Envío simulado: ${existing.asunto}`,
+      accionEspecifica: "NOTIFICACION_SIMULADA",
+      contexto: ctx,
+    });
+  }
+  return updated;
 }
 
 export async function crearNotificacionReajusteCanon(params: {

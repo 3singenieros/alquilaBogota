@@ -5,6 +5,8 @@ import {
   crearInmuebleAction,
   eliminarInmuebleAction,
 } from "@/app/(dashboard)/inmuebles/actions";
+import { listarHistorialInmuebleAction } from "@/app/(dashboard)/trazabilidad/actions";
+import { HistorialTimeline } from "@/components/trazabilidad/historial-timeline";
 import { FilterBar } from "@/components/shared/filter-bar";
 import { StatusBadge, estadoVariant } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -16,7 +18,8 @@ import { Table, Td, Th, Tr } from "@/components/ui/table";
 import { formatCurrency } from "@/lib/utils";
 import { getModulePermissions } from "@/lib/auth/permissions";
 import type { EstadoInmueble, Inmueble, Rol } from "@/types";
-import { Pencil, Plus, Trash2 } from "lucide-react";
+import type { EventoTrazabilidad } from "@/types/trazabilidad";
+import { History, Pencil, Plus, Trash2 } from "lucide-react";
 import { useMemo, useState, useTransition } from "react";
 
 const ESTADOS: EstadoInmueble[] = ["DISPONIBLE", "ARRENDADO", "MANTENIMIENTO"];
@@ -37,6 +40,9 @@ export function InmueblesModule({
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Inmueble | null>(null);
   const [pending, startTransition] = useTransition();
+  const [historialOpen, setHistorialOpen] = useState(false);
+  const [historialEventos, setHistorialEventos] = useState<EventoTrazabilidad[]>([]);
+  const [historialTitulo, setHistorialTitulo] = useState("");
 
   const filtered = useMemo(() => {
     return items.filter((i) => {
@@ -126,9 +132,7 @@ export function InmueblesModule({
             <Th>Tipo</Th>
             <Th>Canon</Th>
             <Th>Estado</Th>
-            {(perms.canEdit || perms.canDelete) && (
-              <Th className="text-right">Acciones</Th>
-            )}
+            <Th className="text-right">Acciones</Th>
           </tr>
         </thead>
         <tbody>
@@ -142,9 +146,23 @@ export function InmueblesModule({
               <Td>
                 <StatusBadge label={i.estado} variant={estadoVariant(i.estado)} />
               </Td>
-              {(perms.canEdit || perms.canDelete) && (
-                <Td className="text-right">
+              <Td className="text-right">
                   <div className="flex justify-end gap-1">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      title="Ver historial"
+                      onClick={() => {
+                        startTransition(async () => {
+                          const eventos = await listarHistorialInmuebleAction(i.id);
+                          setHistorialEventos(eventos);
+                          setHistorialTitulo(i.titulo);
+                          setHistorialOpen(true);
+                        });
+                      }}
+                    >
+                      <History className="h-4 w-4" />
+                    </Button>
                     {perms.canEdit && (
                       <Button
                         variant="ghost"
@@ -164,11 +182,23 @@ export function InmueblesModule({
                     )}
                   </div>
                 </Td>
-              )}
             </Tr>
           ))}
         </tbody>
       </Table>
+
+      <Modal
+        open={historialOpen}
+        onClose={() => setHistorialOpen(false)}
+        title={`Historial — ${historialTitulo}`}
+        footer={
+          <Button variant="secondary" onClick={() => setHistorialOpen(false)}>
+            Cerrar
+          </Button>
+        }
+      >
+        <HistorialTimeline eventos={historialEventos} />
+      </Modal>
 
       <Modal
         open={open}

@@ -6,6 +6,8 @@ import {
   profileToUsuario,
 } from "@/lib/auth/profile-session";
 import type { SessionTokenPayload } from "@/lib/auth/session-token";
+import { auditActorFromUsuario, getAuditActor } from "@/lib/audit/actor";
+import { traceEvento } from "@/lib/audit/trace-helper";
 import { getProfileRepository } from "@/repositories";
 import type { Rol } from "@/types";
 import type { CreateProfileInput, UserProfile } from "@/types/profile";
@@ -92,7 +94,20 @@ export async function updateActiveRole(ref: ProfileLookup, role: Rol) {
   if (!profile.roles.includes(role)) {
     throw new AuthError("No tienes ese rol asignado", "FORBIDDEN");
   }
-  return getProfileRepository().update(profile.id, { rolActivo: role });
+  const anterior = profile.rolActivo;
+  const updated = await getProfileRepository().update(profile.id, { rolActivo: role });
+  const actor = await getAuditActor();
+  await traceEvento(actor, {
+    entidadTipo: "USUARIO",
+    entidadId: profile.id,
+    accion: "ROL_ACTIVO_CAMBIADO",
+    descripcion: `Rol activo: ${anterior} → ${role}`,
+    estadoAnterior: anterior,
+    estadoNuevo: role,
+    valoresAnteriores: { rolActivo: anterior },
+    valoresNuevos: { rolActivo: role },
+  });
+  return updated;
 }
 
 export async function addRoleToProfile(ref: ProfileLookup, role: Rol) {
@@ -110,7 +125,16 @@ export async function addRoleToProfile(ref: ProfileLookup, role: Rol) {
     return profile;
   }
   const roles = [...profile.roles, role] as Rol[];
-  return getProfileRepository().update(profile.id, { roles });
+  const updated = await getProfileRepository().update(profile.id, { roles });
+  const actor = await getAuditActor();
+  await traceEvento(actor, {
+    entidadTipo: "USUARIO",
+    entidadId: profile.id,
+    accion: "ROL_AGREGADO",
+    descripcion: `Rol agregado: ${role}`,
+    valoresNuevos: { roles },
+  });
+  return updated ?? profile;
 }
 
 export async function completeOnboarding(
@@ -166,6 +190,18 @@ export async function completeOnboarding(
       perfilCompletado: true,
     });
   }
+
+  const actor = auditActorFromUsuario(
+    profileToUsuario(profile, photoURL)
+  );
+  await traceEvento(actor, {
+    entidadTipo: "USUARIO",
+    entidadId: profile.id,
+    accion: "ONBOARDING_COMPLETADO",
+    descripcion: `Onboarding completado — roles: ${finalRoles.join(", ")}`,
+    valoresNuevos: { roles: finalRoles, rolActivo: active },
+    metadata: { email: normalizedEmail },
+  });
 
   return { profile, usuario: profileToUsuario(profile, photoURL) };
 }

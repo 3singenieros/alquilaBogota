@@ -34,7 +34,7 @@ const STATS_BY_ROL: Record<
 > = {
   ADMIN: ["inmuebles", "contratos", "pagos", "mantenimiento", "servicios", "notificaciones", "solicitudes"],
   ARRENDADOR: ["inmuebles", "contratos", "pagos", "mantenimiento", "servicios", "notificaciones"],
-  ARRENDATARIO: ["pagos", "mantenimiento", "notificaciones", "solicitudes"],
+  ARRENDATARIO: ["pagos", "mantenimiento", "servicios", "notificaciones", "solicitudes"],
 };
 
 export default async function DashboardPage() {
@@ -72,19 +72,19 @@ export default async function DashboardPage() {
     },
     {
       key: "mantenimiento" as const,
-      label: "Mantenimiento abierto",
-      value: resumen.mantenimientoAbierto,
-      sub: "Incidencias",
+      label: "Tickets mantenimiento",
+      value: resumen.mantenimientoAbierto + resumen.mantenimientoEnGestion,
+      sub: `${resumen.mantenimientoAbierto} abiertos · ${resumen.mantenimientoEnGestion} en gestión · ${resumen.mantenimientoCerrado} cerrados`,
       icon: Hammer,
       color: "text-sky-600 bg-sky-50",
     },
     {
       key: "servicios" as const,
-      label: "Servicios vencidos",
-      value: resumen.serviciosVencidos,
-      sub: "Recibos",
+      label: "Servicios por validar",
+      value: resumen.serviciosPendientesValidacion,
+      sub: `${resumen.serviciosVencidos} vencidos · ${resumen.serviciosValidados} validados`,
       icon: Zap,
-      color: "text-red-600 bg-red-50",
+      color: "text-amber-600 bg-amber-50",
     },
     {
       key: "notificaciones" as const,
@@ -143,6 +143,89 @@ export default async function DashboardPage() {
           </CardContent>
         </Card>
       )}
+
+      {(session.usuario.rol === "ADMIN" ||
+        session.usuario.rol === "ARRENDADOR" ||
+        session.usuario.rol === "ARRENDATARIO") && (
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <Card>
+            <CardContent className="py-4">
+              <p className="text-sm text-slate-500">Pagos de servicios rechazados</p>
+              <p className="text-2xl font-bold text-slate-700">{resumen.serviciosRechazados}</p>
+              <Link href="/servicios" className="mt-1 inline-block text-xs text-indigo-600">
+                Ver servicios
+              </Link>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="py-4">
+              <p className="text-sm text-slate-500">Servicios vencidos</p>
+              <p className="text-2xl font-bold text-red-600">{resumen.serviciosVencidos}</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="py-4">
+              <p className="text-sm text-slate-500">Servicios validados</p>
+              <p className="text-2xl font-bold text-emerald-600">{resumen.serviciosValidados}</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="py-4">
+              <p className="text-sm text-slate-500">Pendientes de validación</p>
+              <p className="text-2xl font-bold text-amber-600">
+                {resumen.serviciosPendientesValidacion}
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      <div className="grid gap-4 lg:grid-cols-2">
+        {resumen.serviciosProximosVencer.length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Servicios próximos a vencer (7 días)</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              {resumen.serviciosProximosVencer.map((s) => (
+                <div
+                  key={s.id}
+                  className="flex items-center justify-between rounded-lg border border-amber-100 bg-amber-50/50 px-3 py-2 text-sm"
+                >
+                  <span>
+                    {s.code} — periodo {s.periodo} · vence {formatDate(s.fechaVencimiento)}
+                  </span>
+                  <Link href="/servicios" className="text-xs font-medium text-indigo-600">
+                    Ver
+                  </Link>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        )}
+        {resumen.serviciosVencidosLista.length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Servicios vencidos</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              {resumen.serviciosVencidosLista.map((s) => (
+                <div
+                  key={s.id}
+                  className="flex items-center justify-between rounded-lg border border-red-100 bg-red-50/50 px-3 py-2 text-sm"
+                >
+                  <span>
+                    {s.code} — periodo {s.periodo} · vence {formatDate(s.fechaVencimiento)}
+                  </span>
+                  <Link href="/servicios" className="text-xs font-medium text-indigo-600">
+                    Gestionar
+                  </Link>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        )}
+      </div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Card>
@@ -271,20 +354,30 @@ export default async function DashboardPage() {
       <div className="grid gap-6 lg:grid-cols-2">
         <Card>
           <CardHeader>
-            <CardTitle>Actividad reciente</CardTitle>
+            <CardTitle>Actividad reciente (trazabilidad)</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            {actividad.map((a) => (
-              <div key={a.id} className="flex gap-3 border-b border-[var(--border)] pb-3 last:border-0 last:pb-0">
-                <div className="mt-0.5 h-2 w-2 shrink-0 rounded-full bg-indigo-500" /> 
-                <div>
-                  <p className="text-sm font-medium text-slate-900">{a.descripcion}</p>
-                  <p className="text-xs text-slate-500">
-                    {a.modulo} · {formatDate(a.fecha)}
-                  </p>
+            {actividad.length === 0 ? (
+              <p className="text-sm text-slate-500">Sin eventos recientes en la bitácora.</p>
+            ) : (
+              actividad.map((a) => (
+                <div
+                  key={a.id}
+                  className="flex gap-3 border-b border-[var(--border)] pb-3 last:border-0 last:pb-0"
+                >
+                  <div className="mt-0.5 h-2 w-2 shrink-0 rounded-full bg-indigo-500" />
+                  <div>
+                    <p className="text-sm font-medium text-slate-900">{a.descripcion}</p>
+                    <p className="text-xs text-slate-500">
+                      {a.accion} · {a.usuario} · {formatDate(a.fecha)}
+                    </p>
+                  </div>
                 </div>
-              </div>
-            ))}
+              ))
+            )}
+            <Link href="/trazabilidad" className="mt-2 inline-block text-xs text-indigo-600">
+              Ver bitácora completa
+            </Link>
           </CardContent>
         </Card>
 

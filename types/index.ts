@@ -12,8 +12,28 @@ export type EstadoContrato =
 export type EstadoInvitacionContrato = "PENDIENTE" | "ACEPTADA" | "RECHAZADA" | "EXPIRADA";
 export type EstadoInmueble = "DISPONIBLE" | "ARRENDADO" | "MANTENIMIENTO";
 export type EstadoPago = "REPORTADO" | "VALIDADO" | "RECHAZADO";
-export type EstadoServicio = "PENDIENTE" | "PAGADO" | "VENCIDO";
-export type EstadoMantenimiento = "ABIERTO" | "EN_PROGRESO" | "RESUELTO" | "CERRADO";
+export type TipoServicioPublico =
+  | "ENERGIA"
+  | "AGUA"
+  | "GAS"
+  | "INTERNET"
+  | "ADMINISTRACION"
+  | "OTRO";
+
+export type PeriodicidadServicio = "MENSUAL" | "BIMESTRAL";
+
+export type EstadoPagoServicioPublico =
+  | "PENDIENTE"
+  | "REPORTADO"
+  | "VALIDADO"
+  | "RECHAZADO"
+  | "VENCIDO";
+export type EstadoMantenimiento =
+  | "ABIERTO"
+  | "EN_GESTION"
+  | "RESUELTO"
+  | "CERRADO"
+  | "RECHAZADO";
 export type EstadoNoRenovacion = "SOLICITADA" | "EN_REVISION" | "ACEPTADA" | "RECHAZADA";
 export type EstadoDepositoGarantia = "PENDIENTE" | "DEVUELTO" | "APLICADO";
 export type EstadoNotificacion = "PENDIENTE" | "SIMULADA" | "ERROR";
@@ -28,8 +48,14 @@ export type TipoNotificacion =
   | "PAGO_REPORTADO"
   | "PAGO_VALIDADO"
   | "PAGO_RECHAZADO"
-  | "SERVICIO_VENCIDO"
-  | "MANTENIMIENTO"
+  | "PAGO_SERVICIO_REPORTADO"
+  | "PAGO_SERVICIO_VALIDADO"
+  | "PAGO_SERVICIO_RECHAZADO"
+  | "PAGO_SERVICIO_VENCIDO"
+  | "MANTENIMIENTO_CREADO"
+  | "MANTENIMIENTO_ESTADO_CAMBIADO"
+  | "MANTENIMIENTO_COMENTARIO"
+  | "MANTENIMIENTO_CERRADO"
   | "REAJUSTE_CANON";
 
 export interface Usuario {
@@ -124,18 +150,39 @@ export interface PagoReportado {
   soportePagoId?: string;
 }
 
-export interface ServicioPublico {
+/** Servicio base configurado en el contrato (arrendador). */
+export interface ServicioPublicoContrato {
   id: string;
   code: string;
+  contratoId: string;
   inmuebleId: string;
-  tipo: string;
+  tipoServicio: TipoServicioPublico;
   empresaPrestadora: string;
   numeroCuentaServicio: string;
+  periodicidad: PeriodicidadServicio;
+  activo: boolean;
+  observaciones?: string;
+}
+
+/** Pago periódico reportado por el arrendatario y validado por el arrendador. */
+export interface PagoServicioPublico {
+  id: string;
+  code: string;
+  servicioPublicoContratoId: string;
+  contratoId: string;
+  inmuebleId: string;
   periodo: string;
-  monto: number;
-  vencimiento: string;
-  estado: EstadoServicio;
+  fechaPago: string;
+  fechaReporte: string;
+  fechaVencimiento: string;
+  valorPagado: number;
+  estado: EstadoPagoServicioPublico;
   comprobanteUrl?: string;
+  reportadoPorId: string;
+  validadoPorId?: string;
+  fechaValidacion?: string;
+  motivoRechazo?: string;
+  observaciones?: string;
 }
 
 export interface Mantenimiento {
@@ -148,8 +195,24 @@ export interface Mantenimiento {
   estado: EstadoMantenimiento;
   solicitadoPorId: string;
   asignadoA?: string;
+  observacionesGestion?: string;
   creadoEn: string;
+  fechaCierre?: string;
   adjuntoUrl?: string;
+}
+
+export interface ComentarioMantenimiento {
+  id: string;
+  mantenimientoId: string;
+  contratoId?: string;
+  inmuebleId: string;
+  usuarioId: string;
+  usuarioNombre: string;
+  usuarioEmail: string;
+  usuarioRol: Rol;
+  comentario: string;
+  adjuntoUrl?: string;
+  fechaCreacion: string;
 }
 
 export interface NoRenovacion {

@@ -46,6 +46,7 @@ export function estadoVariant(estado: string): keyof typeof variants {
     REPORTADO: "warning",
     PENDIENTE: "warning",
     EN_PROGRESO: "warning",
+    EN_GESTION: "warning",
     EN_REVISION: "warning",
     SOLICITADA: "warning",
     VENCIDO: "danger",

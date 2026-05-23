@@ -5,6 +5,12 @@ import {
   getInvitacionesContratoRepository,
   getUsuariosRepository,
 } from "@/repositories";
+import { auditActorFromUsuario } from "@/lib/audit/actor";
+import { contextoDesdeContrato } from "@/lib/audit/context";
+import {
+  accionCambioEstadoContrato,
+  traceCambioEstado,
+} from "@/lib/audit/trace-helper";
 import { registrarNotificacion } from "@/services/notificaciones.service";
 import type { InvitacionContrato } from "@/types";
 
@@ -88,6 +94,29 @@ export async function aceptarInvitacionContrato(invitationId: string) {
     referenciaModulo: "Mis contratos",
   });
 
+  const actor = auditActorFromUsuario(usuario);
+  const ctx = await contextoDesdeContrato(contrato.id);
+  if (updatedInv && updatedContrato) {
+    await traceCambioEstado(actor, {
+      entidadTipo: "INVITACION_CONTRATO",
+      entidadId: invitacion.id,
+      estadoAnterior: "PENDIENTE",
+      estadoNuevo: "ACEPTADA",
+      descripcion: `Invitación aceptada — contrato ${contrato.code} confirmado`,
+      accionEspecifica: "CONTRATO_ACEPTADO",
+      contexto: ctx,
+    });
+    await traceCambioEstado(actor, {
+      entidadTipo: "CONTRATO",
+      entidadId: contrato.id,
+      estadoAnterior: contrato.estado,
+      estadoNuevo: "CONFIRMADO",
+      descripcion: `Contrato ${contrato.code} confirmado por ${usuario.nombre}`,
+      accionEspecifica: accionCambioEstadoContrato(contrato.estado, "CONFIRMADO"),
+      contexto: ctx,
+    });
+  }
+
   return { invitacion: updatedInv, contrato: updatedContrato };
 }
 
@@ -141,6 +170,30 @@ export async function rechazarInvitacionContrato(
       asunto: `Contrato ${contrato.code} rechazado`,
       mensaje: `${usuario.nombre} rechazó el contrato. Motivo: ${motivoRechazo.trim()}`,
       referenciaModulo: "Contratos",
+    });
+  }
+
+  const actor = auditActorFromUsuario(usuario);
+  const ctx = await contextoDesdeContrato(contrato.id);
+  if (updatedInv && updatedContrato) {
+    await traceCambioEstado(actor, {
+      entidadTipo: "INVITACION_CONTRATO",
+      entidadId: invitacion.id,
+      estadoAnterior: "PENDIENTE",
+      estadoNuevo: "RECHAZADA",
+      descripcion: `Invitación rechazada: ${motivoRechazo.trim()}`,
+      accionEspecifica: "CONTRATO_RECHAZADO",
+      contexto: ctx,
+      metadata: { motivoRechazo: motivoRechazo.trim() },
+    });
+    await traceCambioEstado(actor, {
+      entidadTipo: "CONTRATO",
+      entidadId: contrato.id,
+      estadoAnterior: contrato.estado,
+      estadoNuevo: "RECHAZADO",
+      descripcion: `Contrato ${contrato.code} rechazado`,
+      accionEspecifica: accionCambioEstadoContrato(contrato.estado, "RECHAZADO"),
+      contexto: ctx,
     });
   }
 

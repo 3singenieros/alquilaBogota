@@ -1,0 +1,40 @@
+import type { ComentarioMantenimiento } from "@/types";
+
+export const seedComentariosMantenimiento: ComentarioMantenimiento[] = [
+  {
+    id: "cm-1",
+    mantenimientoId: "mnt-1",
+    contratoId: "ctr-1",
+    inmuebleId: "inm-1",
+    usuarioId: "u-arrendador",
+    usuarioNombre: "Carlos Arrendador",
+    usuarioEmail: "arrendador@demo.edu",
+    usuarioRol: "ARRENDADOR",
+    comentario: "Se asignó visita de plomería para el jueves en la mañana.",
+    fechaCreacion: "2026-05-11T09:30:00.000Z",
+  },
+  {
+    id: "cm-2",
+    mantenimientoId: "mnt-1",
+    contratoId: "ctr-1",
+    inmuebleId: "inm-1",
+    usuarioId: "u-arrendatario",
+    usuarioNombre: "María Arrendataria",
+    usuarioEmail: "arrendatario@demo.edu",
+    usuarioRol: "ARRENDATARIO",
+    comentario: "Quedó atento. El goteo empeoró un poco anoche.",
+    fechaCreacion: "2026-05-11T14:00:00.000Z",
+  },
+  {
+    id: "cm-3",
+    mantenimientoId: "mnt-3",
+    contratoId: "ctr-1",
+    inmuebleId: "inm-1",
+    usuarioId: "u-arrendador",
+    usuarioNombre: "Carlos Arrendador",
+    usuarioEmail: "arrendador@demo.edu",
+    usuarioRol: "ARRENDADOR",
+    comentario: "Cierre administrativo: trabajo verificado en visita.",
+    fechaCreacion: "2026-05-15T16:00:00.000Z",
+  },
+];

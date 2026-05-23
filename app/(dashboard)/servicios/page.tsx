@@ -1,19 +1,22 @@
 import { ServiciosModule } from "@/components/modules/servicios-module";
 import { requireSession } from "@/services/auth.service";
-import { listarInmueblesReferencia } from "@/services/inmuebles.service";
-import { listarServicios } from "@/services/servicios.service";
+import { listarContratosReferencia } from "@/services/contratos.service";
+import { listarPagosServicio } from "@/services/pagos-servicio.service";
+import { listarServiciosContrato } from "@/services/servicios-contrato.service";
 
 export default async function ServiciosPage() {
   const session = await requireSession();
-  const [servicios, inmuebles] = await Promise.all([
-    listarServicios(),
-    listarInmueblesReferencia(),
+  const [serviciosContrato, pagos, contratos] = await Promise.all([
+    listarServiciosContrato(),
+    listarPagosServicio(),
+    listarContratosReferencia(),
   ]);
   return (
     <ServiciosModule
-      initialData={servicios}
-      inmuebles={inmuebles}
-      rol={session.usuario.rol}
+      serviciosContrato={serviciosContrato}
+      pagos={pagos}
+      contratos={contratos}
+      rol={session.usuario.rolActivo ?? session.usuario.rol}
     />
   );
 }

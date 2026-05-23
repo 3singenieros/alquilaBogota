@@ -59,13 +59,24 @@ create table if not exists pagos_reportados (
 create table if not exists servicios_publicos (
   id uuid primary key default gen_random_uuid(),
   code text not null unique,
+  contrato_id uuid references contratos(id) on delete set null,
   inmueble_id uuid not null references inmuebles(id) on delete cascade,
   tipo text not null,
-  periodo text not null,
-  monto numeric not null,
-  vencimiento date not null,
-  estado text not null check (estado in ('PENDIENTE', 'PAGADO', 'VENCIDO')),
-  comprobante_url text
+  empresa_prestadora text not null default '',
+  numero_cuenta_servicio text not null default '',
+  codigo_suscriptor text,
+  direccion_servicio text,
+  periodo_facturacion text not null,
+  fecha_emision date,
+  fecha_vencimiento date not null,
+  valor_facturado numeric not null,
+  valor_pagado numeric,
+  estado text not null check (estado in ('PENDIENTE', 'REPORTADO', 'VALIDADO', 'VENCIDO', 'RECHAZADO')),
+  comprobante_pago text,
+  fecha_pago date,
+  validado_por_id uuid references usuarios(id),
+  motivo_rechazo text,
+  observaciones text
 );
 
 create table if not exists mantenimiento (
@@ -75,7 +86,7 @@ create table if not exists mantenimiento (
   titulo text not null,
   descripcion text not null,
   prioridad text not null check (prioridad in ('BAJA', 'MEDIA', 'ALTA')),
-  estado text not null check (estado in ('ABIERTO', 'EN_PROGRESO', 'RESUELTO', 'CERRADO')),
+  estado text not null check (estado in ('ABIERTO', 'EN_GESTION', 'RESUELTO', 'CERRADO', 'RECHAZADO')),
   solicitado_por_id uuid not null references usuarios(id),
   asignado_a text,
   creado_en date not null default current_date,

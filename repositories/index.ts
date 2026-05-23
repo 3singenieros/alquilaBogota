@@ -15,6 +15,11 @@ import {
   type MantenimientoRepository,
 } from "@/repositories/mantenimiento.repository";
 import {
+  comentariosMantenimientoMockRepository,
+  comentariosMantenimientoSupabaseRepository,
+  type ComentariosMantenimientoRepository,
+} from "@/repositories/comentarios-mantenimiento.repository";
+import {
   noRenovacionMockRepository,
   noRenovacionSupabaseRepository,
   type NoRenovacionRepository,
@@ -25,10 +30,15 @@ import {
   type PagosRepository,
 } from "@/repositories/pagos.repository";
 import {
-  serviciosMockRepository,
-  serviciosSupabaseRepository,
-  type ServiciosRepository,
-} from "@/repositories/servicios.repository";
+  serviciosContratoMockRepository,
+  serviciosContratoSupabaseRepository,
+  type ServiciosContratoRepository,
+} from "@/repositories/servicios-contrato.repository";
+import {
+  pagosServicioMockRepository,
+  pagosServicioSupabaseRepository,
+  type PagosServicioRepository,
+} from "@/repositories/pagos-servicio.repository";
 import {
   notificacionesMockRepository,
   notificacionesSupabaseRepository,
@@ -54,6 +64,11 @@ import {
   soportePagoSupabaseRepository,
   type SoportePagoRepository,
 } from "@/repositories/soporte-pago.repository";
+import {
+  trazabilidadMockRepository,
+  trazabilidadSupabaseRepository,
+  type TrazabilidadRepository,
+} from "@/repositories/trazabilidad.repository";
 
 function pick<T>(mock: T, supabase: T): T {
   return USE_MOCK_DATA ? mock : supabase;
@@ -71,12 +86,23 @@ export function getPagosRepository(): PagosRepository {
   return pick(pagosMockRepository, pagosSupabaseRepository);
 }
 
-export function getServiciosRepository(): ServiciosRepository {
-  return pick(serviciosMockRepository, serviciosSupabaseRepository);
+export function getServiciosContratoRepository(): ServiciosContratoRepository {
+  return pick(serviciosContratoMockRepository, serviciosContratoSupabaseRepository);
+}
+
+export function getPagosServicioRepository(): PagosServicioRepository {
+  return pick(pagosServicioMockRepository, pagosServicioSupabaseRepository);
 }
 
 export function getMantenimientoRepository(): MantenimientoRepository {
   return pick(mantenimientoMockRepository, mantenimientoSupabaseRepository);
+}
+
+export function getComentariosMantenimientoRepository(): ComentariosMantenimientoRepository {
+  return pick(
+    comentariosMantenimientoMockRepository,
+    comentariosMantenimientoSupabaseRepository
+  );
 }
 
 export function getNoRenovacionRepository(): NoRenovacionRepository {
@@ -101,4 +127,8 @@ export function getProfileRepository(): ProfileRepository {
 
 export function getSoportePagoRepository(): SoportePagoRepository {
   return pick(soportePagoMockRepository, soportePagoSupabaseRepository);
+}
+
+export function getTrazabilidadRepository(): TrazabilidadRepository {
+  return pick(trazabilidadMockRepository, trazabilidadSupabaseRepository);
 }

@@ -10,6 +10,13 @@ import {
   getNoRenovacionRepository,
   getUsuariosRepository,
 } from "@/repositories";
+import { auditActorFromUsuario } from "@/lib/audit/actor";
+import { contextoDesdeContrato } from "@/lib/audit/context";
+import {
+  traceActualizacion,
+  traceCreado,
+  traceCambioEstado,
+} from "@/lib/audit/trace-helper";
 import {
   crearNotificacionesNoRenovacion,
 } from "@/services/notificaciones.service";
@@ -44,7 +51,7 @@ export async function crearNoRenovacion(data: CreateInput<NoRenovacion>) {
     };
   }
 
-  return getNoRenovacionRepository().create({
+  const created = await getNoRenovacionRepository().create({
     ...data,
     fechaLimitePreaviso: data.fechaLimitePreaviso || contrato.fechaLimitePreaviso,
     destinatarioArrendadorEmail:
@@ -53,6 +60,17 @@ export async function crearNoRenovacion(data: CreateInput<NoRenovacion>) {
       data.destinatarioArrendatarioEmail || arrendatario?.email || "",
     estadoNotificacion: data.estadoNotificacion ?? "PENDIENTE",
   });
+  const actor = auditActorFromUsuario(usuario);
+  const ctx = await contextoDesdeContrato(contrato.id);
+  await traceCreado(
+    actor,
+    "NO_RENOVACION",
+    created.id,
+    `Solicitud de no renovación ${created.code}`,
+    ctx,
+    "NO_RENOVACION_SOLICITADA"
+  );
+  return created;
 }
 
 export async function actualizarNoRenovacion(
@@ -76,7 +94,17 @@ export async function actualizarNoRenovacion(
     throw new AuthError("El arrendatario no puede cambiar el estado de la solicitud", "FORBIDDEN");
   }
 
-  return getNoRenovacionRepository().update(id, data);
+  const updated = await getNoRenovacionRepository().update(id, data);
+  if (updated) {
+    const actor = auditActorFromUsuario(usuario);
+    const ctx = await contextoDesdeContrato(existing.contratoId);
+    await traceActualizacion(actor, "NO_RENOVACION", id, existing, updated, {
+      descripcion: `No renovación ${updated.code} actualizada`,
+      estadoField: "estado",
+      contexto: ctx,
+    });
+  }
+  return updated;
 }
 
 export async function eliminarNoRenovacion(id: string) {
@@ -122,11 +150,23 @@ export async function simularEnvioNotificacionNoRenovacion(id: string) {
     arrendatarioNombre: arrendatario?.nombre ?? "Arrendatario",
   });
 
-  return getNoRenovacionRepository().update(id, {
+  const updated = await getNoRenovacionRepository().update(id, {
     estadoNotificacion: "SIMULADA",
     fechaEnvioNotificacion: now,
     observacionesNotificacion:
       existing.observacionesNotificacion ??
       "Envío simulado registrado en historial de notificaciones.",
   });
+  const actor = auditActorFromUsuario(usuario);
+  const ctx = await contextoDesdeContrato(existing.contratoId);
+  await traceCambioEstado(actor, {
+    entidadTipo: "NO_RENOVACION",
+    entidadId: id,
+    estadoAnterior: existing.estadoNotificacion,
+    estadoNuevo: "SIMULADA",
+    descripcion: `Notificación de no renovación ${existing.code} simulada`,
+    accionEspecifica: "NO_RENOVACION_NOTIFICADA",
+    contexto: ctx,
+  });
+  return updated;
 }

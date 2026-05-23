@@ -9,7 +9,16 @@ import {
   canAccessContrato,
   filterContratos,
 } from "@/lib/auth/scopes";
+import { auditActorFromUsuario, getAuditActor } from "@/lib/audit/actor";
+import { contextoDesdeContrato } from "@/lib/audit/context";
 import { buildContratoCreateInput, calcularCanonReajustado } from "@/lib/contrato-form";
+import {
+  accionCambioEstadoContrato,
+  traceActualizacion,
+  traceCreado,
+  traceEliminado,
+  traceEvento,
+} from "@/lib/audit/trace-helper";
 import {
   getContratosRepository,
   getInvitacionesContratoRepository,
@@ -114,6 +123,24 @@ export async function crearContrato(data: CreateInput<Contrato>) {
     referenciaModulo: "Solicitudes contrato",
   });
 
+  const actor = auditActorFromUsuario(usuario);
+  const ctx = await contextoDesdeContrato(contrato.id);
+  await traceCreado(
+    actor,
+    "CONTRATO",
+    contrato.id,
+    `Contrato ${contrato.code} creado (pendiente de confirmación)`,
+    ctx
+  );
+  await traceEvento(actor, {
+    entidadTipo: "CONTRATO",
+    entidadId: contrato.id,
+    accion: "INVITACION_ENVIADA",
+    descripcion: `Invitación enviada a ${emailArrendatario}`,
+    contexto: ctx,
+    metadata: { emailInvitado: emailArrendatario },
+  });
+
   return contrato;
 }
 
@@ -155,6 +182,17 @@ export async function aplicarReajusteCanon(contratoId: string, porcentaje: numbe
       arrendatario: { nombre: arrendatario.nombre, email: arrendatario.email },
     });
   }
+  const actor = auditActorFromUsuario(usuario);
+  const ctx = await contextoDesdeContrato(updated.id);
+  await traceEvento(actor, {
+    entidadTipo: "CONTRATO",
+    entidadId: updated.id,
+    accion: "REAJUSTE_CANON_APLICADO",
+    descripcion: `Reajuste ${porcentaje}% aplicado: ${canonAnterior} → ${canonActual}`,
+    valoresAnteriores: { canonActual: canonAnterior },
+    valoresNuevos: { canonActual, porcentajeReajuste: porcentaje },
+    contexto: ctx,
+  });
   return updated;
 }
 
@@ -173,7 +211,26 @@ export async function actualizarContrato(id: string, data: UpdateInput<Contrato>
   if (finalEstado === "CONFIRMADO" || finalEstado === "PENDIENTE_CONFIRMACION") {
     await assertUnSoloContratoActivoPorInmueble(finalInmuebleId, finalEstado, id);
   }
-  return getContratosRepository().update(id, data);
+  const updated = await getContratosRepository().update(id, data);
+  if (updated) {
+    const actor = auditActorFromUsuario(usuario);
+    const ctx = await contextoDesdeContrato(id);
+    await traceActualizacion(actor, "CONTRATO", id, existing, updated, {
+      descripcion: `Contrato ${updated.code} actualizado`,
+      estadoField: "estado",
+      accionPorEstado: accionCambioEstadoContrato,
+      camposCanon: true,
+      documentoField: "documentoUrl",
+      contexto: ctx,
+      camposExtra: [
+        "codeudorNombre",
+        "depositoGarantiaValor",
+        "prorrogaAutomatica",
+        "fechaLimitePreaviso",
+      ],
+    });
+  }
+  return updated;
 }
 
 export async function eliminarContrato(id: string) {
@@ -186,5 +243,14 @@ export async function eliminarContrato(id: string) {
   if (!existing || !canAccessContrato(existing, usuario)) {
     throw new AuthError("Contrato no encontrado o sin permiso", "FORBIDDEN");
   }
+  const actor = await getAuditActor();
+  const ctx = await contextoDesdeContrato(id);
+  await traceEliminado(
+    actor,
+    "CONTRATO",
+    id,
+    `Contrato ${existing.code} eliminado`,
+    ctx
+  );
   return getContratosRepository().delete(id);
 }

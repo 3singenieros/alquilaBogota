@@ -11,6 +11,13 @@ import { assertModuleAccess, requireSession } from "@/services/auth.service";
 import { sendPaymentSupportEmail } from "@/services/email.service";
 import { registrarNotificacion } from "@/services/notificaciones.service";
 import type { CreateInput, PagoReportado, UpdateInput } from "@/types";
+import { auditActorFromUsuario } from "@/lib/audit/actor";
+import { contextoDesdeContrato } from "@/lib/audit/context";
+import {
+  accionCambioEstadoPago,
+  traceCambioEstado,
+  traceEvento,
+} from "@/lib/audit/trace-helper";
 import { formatCurrency } from "@/lib/utils";
 
 async function assertPagoAccess(contratoId: string) {
@@ -88,6 +95,18 @@ export async function crearPago(data: CreateInput<PagoReportado>) {
     estado: "PENDIENTE",
   });
 
+  const actor = auditActorFromUsuario(usuario);
+  const ctx = await contextoDesdeContrato(contrato.id);
+  await traceEvento(actor, {
+    entidadTipo: "PAGO",
+    entidadId: created.id,
+    accion: "PAGO_REPORTADO",
+    descripcion: `Pago ${created.code} reportado (${created.mes})`,
+    estadoNuevo: "REPORTADO",
+    contexto: { ...ctx, pagoId: created.id },
+    valoresNuevos: { monto: created.monto, mes: created.mes },
+  });
+
   return created;
 }
 
@@ -162,6 +181,26 @@ export async function validarPago(pagoId: string, observaciones?: string) {
   const soporteFinal =
     (await getSoportePagoRepository().findById(soporte.id)) ?? soporte;
 
+  const actor = auditActorFromUsuario(usuario);
+  const ctx = await contextoDesdeContrato(contrato.id);
+  await traceCambioEstado(actor, {
+    entidadTipo: "PAGO",
+    entidadId: pago.id,
+    estadoAnterior: "REPORTADO",
+    estadoNuevo: "VALIDADO",
+    descripcion: `Pago ${pago.code} validado — soporte ${soporte.numeroSoporte}`,
+    accionEspecifica: accionCambioEstadoPago("REPORTADO", "VALIDADO"),
+    contexto: { ...ctx, pagoId: pago.id },
+  });
+  await traceEvento(actor, {
+    entidadTipo: "SOPORTE_PAGO",
+    entidadId: soporteFinal.id,
+    accion: "SOPORTE_GENERADO",
+    descripcion: `Soporte ${soporteFinal.numeroSoporte} generado`,
+    contexto: { ...ctx, pagoId: pago.id },
+    metadata: { numeroSoporte: soporteFinal.numeroSoporte },
+  });
+
   return { pago: updated, soporte: soporteFinal };
 }
 
@@ -206,6 +245,19 @@ export async function rechazarPago(pagoId: string, motivoRechazo: string) {
     referenciaModulo: "Pagos",
     estado: "SIMULADA",
     fechaEnvioSimulado: new Date().toISOString(),
+  });
+
+  const actor = auditActorFromUsuario(usuario);
+  const ctx = await contextoDesdeContrato(contrato.id);
+  await traceCambioEstado(actor, {
+    entidadTipo: "PAGO",
+    entidadId: pago.id,
+    estadoAnterior: "REPORTADO",
+    estadoNuevo: "RECHAZADO",
+    descripcion: `Pago ${pago.code} rechazado: ${motivo}`,
+    accionEspecifica: accionCambioEstadoPago("REPORTADO", "RECHAZADO"),
+    contexto: { ...ctx, pagoId: pago.id },
+    metadata: { motivoRechazo: motivo },
   });
 
   return updated;

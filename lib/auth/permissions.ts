@@ -10,7 +10,8 @@ export type AppModule =
   | "no-renovacion"
   | "notificaciones"
   | "solicitudes-contrato"
-  | "usuarios";
+  | "usuarios"
+  | "trazabilidad";
 
 export type ModulePermissions = {
   canCreate: boolean;
@@ -29,6 +30,7 @@ const MODULE_ACCESS: Record<AppModule, Rol[]> = {
   notificaciones: ["ADMIN", "ARRENDADOR", "ARRENDATARIO"],
   "solicitudes-contrato": ["ADMIN", "ARRENDATARIO"],
   usuarios: ["ADMIN"],
+  trazabilidad: ["ADMIN", "ARRENDADOR"],
 };
 
 const PATH_MODULE: Record<string, AppModule> = {
@@ -43,6 +45,7 @@ const PATH_MODULE: Record<string, AppModule> = {
   "/notificaciones": "notificaciones",
   "/solicitudes-contrato": "solicitudes-contrato",
   "/usuarios": "usuarios",
+  "/trazabilidad": "trazabilidad",
 };
 
 export const NAV_ITEMS: {
@@ -61,6 +64,7 @@ export const NAV_ITEMS: {
   { href: "/notificaciones", label: "Notificaciones", module: "notificaciones", roles: ["ADMIN", "ARRENDADOR", "ARRENDATARIO"] },
   { href: "/solicitudes-contrato", label: "Solicitudes contrato", module: "solicitudes-contrato", roles: ["ADMIN", "ARRENDATARIO"] },
   { href: "/usuarios", label: "Usuarios y roles", module: "usuarios", roles: ["ADMIN"] },
+  { href: "/trazabilidad", label: "Trazabilidad", module: "trazabilidad", roles: ["ADMIN", "ARRENDADOR"] },
 ];
 
 export function canAccessModule(rol: Rol, module: AppModule): boolean {

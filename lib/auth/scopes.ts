@@ -1,27 +1,49 @@
+import { rolEfectivo } from "@/lib/auth/rol";
 import type {
   Contrato,
   Inmueble,
   Mantenimiento,
   NoRenovacion,
   PagoReportado,
-  ServicioPublico,
+  PagoServicioPublico,
   Usuario,
 } from "@/types";
 
 export function filterInmuebles(items: Inmueble[], user: Usuario): Inmueble[] {
-  if (user.rol === "ADMIN") return items;
-  if (user.rol === "ARRENDADOR") {
+  const rol = rolEfectivo(user);
+  if (rol === "ADMIN") return items;
+  if (rol === "ARRENDADOR") {
     return items.filter((i) => i.arrendadorId === user.id);
   }
   return [];
 }
 
+/** Inmuebles donde el usuario puede abrir una solicitud de mantenimiento. */
+export function inmueblesParaMantenimiento(
+  inmuebles: Inmueble[],
+  contratos: Contrato[],
+  user: Usuario
+): Inmueble[] {
+  const rol = rolEfectivo(user);
+  if (rol === "ADMIN") return inmuebles;
+  if (rol === "ARRENDATARIO") {
+    const ids = new Set(
+      filterContratos(contratos, user)
+        .filter((c) => c.estado === "CONFIRMADO")
+        .map((c) => c.inmuebleId)
+    );
+    return inmuebles.filter((i) => ids.has(i.id));
+  }
+  return filterInmuebles(inmuebles, user);
+}
+
 export function filterContratos(items: Contrato[], user: Usuario): Contrato[] {
-  if (user.rol === "ADMIN") return items;
-  if (user.rol === "ARRENDADOR") {
+  const rol = rolEfectivo(user);
+  if (rol === "ADMIN") return items;
+  if (rol === "ARRENDADOR") {
     return items.filter((c) => c.arrendadorId === user.id);
   }
-  if (user.rol === "ARRENDATARIO") {
+  if (rol === "ARRENDATARIO") {
     const email = user.email.toLowerCase();
     return items.filter(
       (c) =>
@@ -51,28 +73,30 @@ export function filterPagos(
   user: Usuario,
   contratos: Contrato[]
 ): PagoReportado[] {
-  if (user.rol === "ADMIN") return items;
+  if (rolEfectivo(user) === "ADMIN") return items;
   const ids = contratoIdsForUser(user, contratos);
   return items.filter((p) => ids.has(p.contratoId));
 }
 
-export function filterServicios(
-  items: ServicioPublico[],
+export function filterPagosServicio(
+  items: PagoServicioPublico[],
   user: Usuario,
-  inmuebles: Inmueble[]
-): ServicioPublico[] {
-  if (user.rol === "ADMIN") return items;
-  const ids = inmuebleIdsForUser(user, inmuebles);
-  return items.filter((s) => ids.has(s.inmuebleId));
+  contratos: Contrato[]
+): PagoServicioPublico[] {
+  if (rolEfectivo(user) === "ADMIN") return items;
+  const ids = contratoIdsForUser(user, contratos);
+  return items.filter((p) => ids.has(p.contratoId));
 }
 
 export function filterMantenimiento(
   items: Mantenimiento[],
   user: Usuario,
-  inmuebles: Inmueble[]
+  inmuebles: Inmueble[],
+  contratos: Contrato[] = []
 ): Mantenimiento[] {
-  if (user.rol === "ADMIN") return items;
-  if (user.rol === "ARRENDATARIO") {
+  const rol = rolEfectivo(user);
+  if (rol === "ADMIN") return items;
+  if (rol === "ARRENDATARIO") {
     return items.filter((m) => m.solicitadoPorId === user.id);
   }
   const ids = inmuebleIdsForUser(user, inmuebles);
@@ -84,7 +108,7 @@ export function filterNoRenovacion(
   user: Usuario,
   contratos: Contrato[]
 ): NoRenovacion[] {
-  if (user.rol === "ADMIN") return items;
+  if (rolEfectivo(user) === "ADMIN") return items;
   const ids = contratoIdsForUser(user, contratos);
   return items.filter((n) => ids.has(n.contratoId));
 }

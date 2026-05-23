@@ -7,6 +7,8 @@ import {
   eliminarContratoAction,
   listarInmueblesParaContratoFormAction,
 } from "@/app/(dashboard)/contratos/actions";
+import { listarHistorialContratoAction } from "@/app/(dashboard)/trazabilidad/actions";
+import { HistorialTimeline } from "@/components/trazabilidad/historial-timeline";
 import { FormSection } from "@/components/shared/form-section";
 import { SimulatedFileInput } from "@/components/shared/simulated-file-input";
 import { FilterBar } from "@/components/shared/filter-bar";
@@ -35,7 +37,9 @@ import type {
   Rol,
   Usuario,
 } from "@/types";
-import { Percent, Pencil, Plus, Trash2 } from "lucide-react";
+import type { EventoTrazabilidad } from "@/types/trazabilidad";
+import { ContratoServiciosModal } from "@/components/contratos/contrato-servicios-modal";
+import { History, Percent, Pencil, Plus, Trash2, Zap } from "lucide-react";
 import { useEffect, useMemo, useState, useTransition } from "react";
 
 const ESTADOS: EstadoContrato[] = [
@@ -78,6 +82,11 @@ export function ContratosModule({
   const [porcentajeReajuste, setPorcentajeReajuste] = useState("5");
   const [editing, setEditing] = useState<Contrato | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
+  const [historialOpen, setHistorialOpen] = useState(false);
+  const [historialEventos, setHistorialEventos] = useState<EventoTrazabilidad[]>([]);
+  const [historialTitulo, setHistorialTitulo] = useState("");
+  const [serviciosOpen, setServiciosOpen] = useState(false);
+  const [serviciosContrato, setServiciosContrato] = useState<Contrato | null>(null);
   const [pending, startTransition] = useTransition();
 
   useEffect(() => {
@@ -198,7 +207,7 @@ export function ContratosModule({
               <Th>Preaviso</Th>
               <Th>Codeudor</Th>
               <Th>Depósito</Th>
-              {(perms.canEdit || perms.canDelete) && <Th className="text-right">Acciones</Th>}
+              <Th className="text-right">Acciones</Th>
             </tr>
           </thead>
           <tbody>
@@ -224,8 +233,35 @@ export function ContratosModule({
                     variant={estadoVariant(c.depositoGarantiaEstado)}
                   />
                 </Td>
-                {(perms.canEdit || perms.canDelete) && (
-                  <Td className="text-right whitespace-nowrap">
+                <Td className="text-right whitespace-nowrap">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      title="Ver historial"
+                      onClick={() => {
+                        startTransition(async () => {
+                          const eventos = await listarHistorialContratoAction(c.id);
+                          setHistorialEventos(eventos);
+                          setHistorialTitulo(`Contrato ${c.code}`);
+                          setHistorialOpen(true);
+                        });
+                      }}
+                    >
+                      <History className="h-4 w-4" />
+                    </Button>
+                    {(perms.canEdit || rol === "ADMIN") && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        title="Servicios públicos del contrato"
+                        onClick={() => {
+                          setServiciosContrato(c);
+                          setServiciosOpen(true);
+                        }}
+                      >
+                        <Zap className="h-4 w-4 text-amber-600" />
+                      </Button>
+                    )}
                     {perms.canEdit && (
                       <>
                         <Button variant="ghost" size="sm" onClick={() => openForm(c)}>
@@ -263,12 +299,27 @@ export function ContratosModule({
                       </Button>
                     )}
                   </Td>
-                )}
               </Tr>
             ))}
           </tbody>
         </Table>
       </div>
+
+      <Modal
+        open={historialOpen}
+        onClose={() => setHistorialOpen(false)}
+        title={`Historial — ${historialTitulo}`}
+        footer={
+          <Button variant="secondary" onClick={() => setHistorialOpen(false)}>
+            Cerrar
+          </Button>
+        }
+      >
+        <HistorialTimeline eventos={historialEventos} />
+        <p className="mt-4 text-xs text-slate-500">
+          Datos listos para futuro reporte PDF contractual (reportes-trazabilidad.service).
+        </p>
+      </Modal>
 
       <Modal
         open={open}
@@ -507,6 +558,16 @@ export function ContratosModule({
           </div>
         )}
       </Modal>
+
+      <ContratoServiciosModal
+        contrato={serviciosContrato}
+        open={serviciosOpen}
+        onClose={() => {
+          setServiciosOpen(false);
+          setServiciosContrato(null);
+        }}
+        canEdit={perms.canEdit}
+      />
     </>
   );
 }

@@ -5,6 +5,12 @@ import {
   canAccessInmueble,
   filterInmuebles,
 } from "@/lib/auth/scopes";
+import { auditActorFromUsuario, getAuditActor } from "@/lib/audit/actor";
+import {
+  traceActualizacion,
+  traceCreado,
+  traceEliminado,
+} from "@/lib/audit/trace-helper";
 import { getInmueblesRepository } from "@/repositories";
 import type { CreateInput, Inmueble, UpdateInput } from "@/types";
 
@@ -38,7 +44,16 @@ export async function crearInmueble(data: CreateInput<Inmueble>) {
   if (usuario.rol !== "ADMIN" && usuario.rol !== "ARRENDADOR") {
     throw new AuthError("No puedes crear inmuebles", "FORBIDDEN");
   }
-  return getInmueblesRepository().create(data);
+  const created = await getInmueblesRepository().create(data);
+  const actor = auditActorFromUsuario(usuario);
+  await traceCreado(
+    actor,
+    "INMUEBLE",
+    created.id,
+    `Inmueble ${created.code} creado (${created.titulo})`,
+    { inmuebleId: created.id }
+  );
+  return created;
 }
 
 export async function actualizarInmueble(id: string, data: UpdateInput<Inmueble>) {
@@ -51,7 +66,25 @@ export async function actualizarInmueble(id: string, data: UpdateInput<Inmueble>
   if (usuario.rol === "ARRENDADOR") {
     data = { ...data, arrendadorId: usuario.id };
   }
-  return getInmueblesRepository().update(id, data);
+  const updated = await getInmueblesRepository().update(id, data);
+  if (updated) {
+    const actor = auditActorFromUsuario(usuario);
+    await traceActualizacion(actor, "INMUEBLE", id, existing, updated, {
+      descripcion: `Inmueble ${updated.code} actualizado`,
+      estadoField: "estado",
+      accionPorEstado: () => undefined,
+      contexto: { inmuebleId: id },
+      camposExtra: ["titulo", "direccion", "canonMensual", "estado"],
+    });
+    if (existing.estado !== updated.estado && updated.estado === "MANTENIMIENTO") {
+      await traceActualizacion(actor, "INMUEBLE", id, existing, updated, {
+        descripcion: `Inmueble ${updated.code} marcado en mantenimiento/inactivo`,
+        estadoField: "estado",
+        contexto: { inmuebleId: id },
+      });
+    }
+  }
+  return updated;
 }
 
 export async function eliminarInmueble(id: string) {
@@ -64,5 +97,13 @@ export async function eliminarInmueble(id: string) {
   if (!existing || !canAccessInmueble(existing, usuario)) {
     throw new AuthError("Inmueble no encontrado o sin permiso", "FORBIDDEN");
   }
+  const actor = await getAuditActor();
+  await traceEliminado(
+    actor,
+    "INMUEBLE",
+    id,
+    `Inmueble ${existing.code} eliminado`,
+    { inmuebleId: id }
+  );
   return getInmueblesRepository().delete(id);
 }
