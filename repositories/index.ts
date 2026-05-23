@@ -49,6 +49,11 @@ import {
   profileSupabaseRepository,
   type ProfileRepository,
 } from "@/repositories/profile.repository";
+import {
+  soportePagoMockRepository,
+  soportePagoSupabaseRepository,
+  type SoportePagoRepository,
+} from "@/repositories/soporte-pago.repository";
 
 function pick<T>(mock: T, supabase: T): T {
   return USE_MOCK_DATA ? mock : supabase;
@@ -92,4 +97,8 @@ export function getInvitacionesContratoRepository(): InvitacionesContratoReposit
 
 export function getProfileRepository(): ProfileRepository {
   return pick(profileMockRepository, profileSupabaseRepository);
+}
+
+export function getSoportePagoRepository(): SoportePagoRepository {
+  return pick(soportePagoMockRepository, soportePagoSupabaseRepository);
 }

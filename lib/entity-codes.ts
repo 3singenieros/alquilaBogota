@@ -9,6 +9,7 @@ export const ENTITY_CODE_PREFIX = {
   servicio: "srv",
   mantenimiento: "mnt",
   noRenovacion: "nr",
+  soportePago: "sp",
 } as const;
 
 export function generateUniqueCode(

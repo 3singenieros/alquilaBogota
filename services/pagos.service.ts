@@ -1,12 +1,17 @@
 import { AuthError } from "@/lib/auth/errors";
 import { loadAuthContext } from "@/lib/auth/load-context";
-import { assertModuleAccess, requireSession } from "@/services/auth.service";
+import { canAccessContrato, filterPagos } from "@/lib/auth/scopes";
 import {
-  canAccessContrato,
-  filterPagos,
-} from "@/lib/auth/scopes";
-import { getContratosRepository, getPagosRepository } from "@/repositories";
+  getContratosRepository,
+  getPagosRepository,
+  getSoportePagoRepository,
+  getUsuariosRepository,
+} from "@/repositories";
+import { assertModuleAccess, requireSession } from "@/services/auth.service";
+import { sendPaymentSupportEmail } from "@/services/email.service";
+import { registrarNotificacion } from "@/services/notificaciones.service";
 import type { CreateInput, PagoReportado, UpdateInput } from "@/types";
+import { formatCurrency } from "@/lib/utils";
 
 async function assertPagoAccess(contratoId: string) {
   const { usuario } = await requireSession();
@@ -15,6 +20,34 @@ async function assertPagoAccess(contratoId: string) {
     throw new AuthError("Contrato no permitido para este usuario", "FORBIDDEN");
   }
   return { usuario, contrato };
+}
+
+function rolEfectivo(usuario: { rol: string; rolActivo?: string }) {
+  return usuario.rolActivo ?? usuario.rol;
+}
+
+async function resolverArrendatario(contrato: {
+  arrendatarioId: string;
+  nombreArrendatario?: string;
+  emailArrendatario: string;
+}) {
+  const usuarios = await getUsuariosRepository().findAll();
+  const u = usuarios.find((x) => x.id === contrato.arrendatarioId);
+  return {
+    id: contrato.arrendatarioId || u?.id || "",
+    nombre: u?.nombre ?? contrato.nombreArrendatario ?? "Arrendatario",
+    email: u?.email ?? contrato.emailArrendatario,
+  };
+}
+
+async function resolverArrendador(arrendadorId: string) {
+  const usuarios = await getUsuariosRepository().findAll();
+  const u = usuarios.find((x) => x.id === arrendadorId);
+  return {
+    id: arrendadorId,
+    nombre: u?.nombre ?? "Arrendador",
+    email: u?.email ?? "",
+  };
 }
 
 export async function listarPagos() {
@@ -26,19 +59,156 @@ export async function listarPagos() {
 }
 
 export async function crearPago(data: CreateInput<PagoReportado>) {
-  const { usuario } = await requireSession();
+  const { usuario, contrato } = await assertPagoAccess(data.contratoId);
   assertModuleAccess(usuario.rol, "pagos");
-  await assertPagoAccess(data.contratoId);
 
-  if (usuario.rol === "ARRENDATARIO") {
-    data = {
-      ...data,
-      reportadoPorId: usuario.id,
-      estado: "REPORTADO",
-    };
+  const rol = rolEfectivo(usuario);
+  if (rol !== "ARRENDATARIO" && rol !== "ADMIN") {
+    throw new AuthError("Solo el arrendatario puede reportar pagos", "FORBIDDEN");
   }
 
-  return getPagosRepository().create(data);
+  const payload: CreateInput<PagoReportado> = {
+    ...data,
+    reportadoPorId: usuario.id,
+    estado: "REPORTADO",
+  };
+
+  const created = await getPagosRepository().create(payload);
+  const arrendador = await resolverArrendador(contrato.arrendadorId);
+
+  await registrarNotificacion({
+    contratoId: contrato.id,
+    tipo: "PAGO_REPORTADO",
+    destinatarioNombre: arrendador.nombre,
+    destinatarioEmail: arrendador.email,
+    rolDestinatario: "ARRENDADOR",
+    asunto: `Nuevo pago reportado — ${created.mes}`,
+    mensaje: `El arrendatario reportó el pago ${created.code} por ${formatCurrency(created.monto)} (${created.mes}). Pendiente de validación.`,
+    referenciaModulo: "Pagos",
+    estado: "PENDIENTE",
+  });
+
+  return created;
+}
+
+export async function validarPago(pagoId: string, observaciones?: string) {
+  const { usuario } = await requireSession();
+  const rol = rolEfectivo(usuario);
+  if (rol !== "ARRENDADOR" && rol !== "ADMIN") {
+    throw new AuthError("Solo el arrendador puede validar pagos", "FORBIDDEN");
+  }
+
+  const pago = await getPagosRepository().findById(pagoId);
+  if (!pago) {
+    throw new AuthError("Pago no encontrado", "FORBIDDEN");
+  }
+  if (pago.estado !== "REPORTADO") {
+    throw new AuthError("Solo se pueden validar pagos en estado REPORTADO", "FORBIDDEN");
+  }
+
+  const { contrato } = await assertPagoAccess(pago.contratoId);
+  const arrendatario = await resolverArrendatario(contrato);
+  const fechaValidacion = new Date().toISOString().slice(0, 10);
+
+  const soporte = await getSoportePagoRepository().create({
+    pagoId: pago.id,
+    contratoId: contrato.id,
+    arrendadorId: contrato.arrendadorId,
+    arrendatarioId: arrendatario.id || pago.reportadoPorId,
+    fechaGeneracion: fechaValidacion,
+    monto: pago.monto,
+    periodo: pago.mes,
+    medioPago: pago.medioPago,
+    observaciones: observaciones?.trim() || undefined,
+    estadoEnvioEmail: "PENDIENTE",
+  });
+
+  const emailResult = await sendPaymentSupportEmail({
+    destinatarioEmail: arrendatario.email,
+    destinatarioNombre: arrendatario.nombre,
+    numeroSoporte: soporte.numeroSoporte,
+    monto: pago.monto,
+    periodo: pago.mes,
+    contratoCode: contrato.code,
+  });
+
+  if (emailResult.success) {
+    await getSoportePagoRepository().update(soporte.id, {
+      estadoEnvioEmail: "SIMULADO" as const,
+    });
+  }
+
+  const updated =
+    (await getPagosRepository().update(pago.id, {
+      estado: "VALIDADO",
+      fechaValidacion,
+      validadoPorId: usuario.id,
+      soportePagoId: soporte.id,
+    })) ?? pago;
+
+  await registrarNotificacion({
+    contratoId: contrato.id,
+    tipo: "PAGO_VALIDADO",
+    destinatarioNombre: arrendatario.nombre,
+    destinatarioEmail: arrendatario.email,
+    rolDestinatario: "ARRENDATARIO",
+    asunto: `Pago validado — ${pago.mes}`,
+    mensaje: `Tu pago ${pago.code} por ${formatCurrency(pago.monto)} fue validado. Soporte ${soporte.numeroSoporte} disponible para descarga.`,
+    referenciaModulo: "Pagos",
+    estado: "SIMULADA",
+    fechaEnvioSimulado: new Date().toISOString(),
+  });
+
+  const soporteFinal =
+    (await getSoportePagoRepository().findById(soporte.id)) ?? soporte;
+
+  return { pago: updated, soporte: soporteFinal };
+}
+
+export async function rechazarPago(pagoId: string, motivoRechazo: string) {
+  const { usuario } = await requireSession();
+  const rol = rolEfectivo(usuario);
+  if (rol !== "ARRENDADOR" && rol !== "ADMIN") {
+    throw new AuthError("Solo el arrendador puede rechazar pagos", "FORBIDDEN");
+  }
+
+  const motivo = motivoRechazo.trim();
+  if (!motivo) {
+    throw new AuthError("El motivo de rechazo es obligatorio", "FORBIDDEN");
+  }
+
+  const pago = await getPagosRepository().findById(pagoId);
+  if (!pago) {
+    throw new AuthError("Pago no encontrado", "FORBIDDEN");
+  }
+  if (pago.estado !== "REPORTADO") {
+    throw new AuthError("Solo se pueden rechazar pagos en estado REPORTADO", "FORBIDDEN");
+  }
+
+  const { contrato } = await assertPagoAccess(pago.contratoId);
+  const arrendatario = await resolverArrendatario(contrato);
+
+  const updated =
+    (await getPagosRepository().update(pago.id, {
+      estado: "RECHAZADO",
+      rechazadoPorId: usuario.id,
+      motivoRechazo: motivo,
+    })) ?? pago;
+
+  await registrarNotificacion({
+    contratoId: contrato.id,
+    tipo: "PAGO_RECHAZADO",
+    destinatarioNombre: arrendatario.nombre,
+    destinatarioEmail: arrendatario.email,
+    rolDestinatario: "ARRENDATARIO",
+    asunto: `Pago rechazado — ${pago.mes}`,
+    mensaje: `Tu pago ${pago.code} fue rechazado. Motivo: ${motivo}`,
+    referenciaModulo: "Pagos",
+    estado: "SIMULADA",
+    fechaEnvioSimulado: new Date().toISOString(),
+  });
+
+  return updated;
 }
 
 export async function actualizarPago(id: string, data: UpdateInput<PagoReportado>) {
@@ -51,7 +221,7 @@ export async function actualizarPago(id: string, data: UpdateInput<PagoReportado
   }
   await assertPagoAccess(pago.contratoId);
 
-  if (usuario.rol === "ARRENDATARIO") {
+  if (rolEfectivo(usuario) === "ARRENDATARIO") {
     throw new AuthError("El arrendatario no puede modificar pagos", "FORBIDDEN");
   }
 

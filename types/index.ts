@@ -26,6 +26,8 @@ export type TipoNotificacion =
   | "CONTRATO_PROXIMO_VENCER"
   | "NO_RENOVACION"
   | "PAGO_REPORTADO"
+  | "PAGO_VALIDADO"
+  | "PAGO_RECHAZADO"
   | "SERVICIO_VENCIDO"
   | "MANTENIMIENTO"
   | "REAJUSTE_CANON";
@@ -113,7 +115,13 @@ export interface PagoReportado {
   estado: EstadoPago;
   comprobanteUrl?: string;
   notas?: string;
+  medioPago?: string;
   reportadoPorId: string;
+  fechaValidacion?: string;
+  validadoPorId?: string;
+  rechazadoPorId?: string;
+  motivoRechazo?: string;
+  soportePagoId?: string;
 }
 
 export interface ServicioPublico {

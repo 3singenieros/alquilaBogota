@@ -66,7 +66,7 @@ export default async function DashboardPage() {
       key: "pagos" as const,
       label: "Pagos por validar",
       value: resumen.pagosPendientes,
-      sub: "Reportados",
+      sub: `${resumen.pagosValidados} validados · ${resumen.pagosRechazados} rechazados`,
       icon: Receipt,
       color: "text-amber-600 bg-amber-50",
     },
@@ -143,6 +143,36 @@ export default async function DashboardPage() {
           </CardContent>
         </Card>
       )}
+
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <Card>
+          <CardContent className="py-4">
+            <p className="text-sm text-slate-500">Pagos reportados pendientes</p>
+            <p className="text-2xl font-bold text-amber-600">{resumen.pagosPendientes}</p>
+            <Link href="/pagos" className="mt-1 inline-block text-xs text-indigo-600">
+              Revisar pagos
+            </Link>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="py-4">
+            <p className="text-sm text-slate-500">Pagos validados</p>
+            <p className="text-2xl font-bold text-emerald-600">{resumen.pagosValidados}</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="py-4">
+            <p className="text-sm text-slate-500">Pagos rechazados</p>
+            <p className="text-2xl font-bold text-red-600">{resumen.pagosRechazados}</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="py-4">
+            <p className="text-sm text-slate-500">Soportes PDF generados</p>
+            <p className="text-2xl font-bold text-indigo-600">{resumen.soportesGenerados}</p>
+          </CardContent>
+        </Card>
+      </div>
 
       <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-3">
         {session.usuario.rol !== "ARRENDATARIO" && (

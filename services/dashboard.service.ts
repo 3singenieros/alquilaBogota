@@ -2,6 +2,7 @@ import { seedActividad, seedIncidencias } from "@/data/mock/seed";
 import { contratoProximoAVencer, preavisoVencido } from "@/lib/contrato-alertas";
 import { loadAuthContext } from "@/lib/auth/load-context";
 import {
+  contratoIdsForUser,
   filterContratos,
   filterInmuebles,
   filterMantenimiento,
@@ -14,6 +15,7 @@ import {
   getNotificacionesRepository,
   getPagosRepository,
   getServiciosRepository,
+  getSoportePagoRepository,
 } from "@/repositories";
 import { filtroNotificacionesPorRol } from "@/services/notificaciones.service";
 import type { Contrato, Rol } from "@/types";
@@ -31,14 +33,20 @@ export async function getDashboardResumen() {
   const { contratos, inmuebles } = await loadAuthContext();
   const inmueblesScope = filterInmuebles(inmuebles, usuario);
   const contratosScope = filterContratos(contratos, usuario);
-  const [pagosAll, mantenimientoAll, serviciosAll, notificacionesAll] =
+  const [pagosAll, mantenimientoAll, serviciosAll, notificacionesAll, soportesAll] =
     await Promise.all([
       getPagosRepository().findAll(),
       getMantenimientoRepository().findAll(),
       getServiciosRepository().findAll(),
       getNotificacionesRepository().findAll(),
+      getSoportePagoRepository().findAll(),
     ]);
   const pagos = filterPagos(pagosAll, usuario, contratos);
+  const contratoIds = contratoIdsForUser(usuario, contratos);
+  const soportesScope =
+    usuario.rol === "ADMIN"
+      ? soportesAll
+      : soportesAll.filter((s) => contratoIds.has(s.contratoId));
   const mantenimiento = filterMantenimiento(mantenimientoAll, usuario, inmuebles);
   const servicios = serviciosAll.filter((s) =>
     inmueblesScope.some((i) => i.id === s.inmuebleId)
@@ -70,6 +78,9 @@ export async function getDashboardResumen() {
     inmueblesArrendados: inmueblesScope.filter((i) => i.estado === "ARRENDADO").length,
     contratosActivos: contratosActivosList.length,
     pagosPendientes: pagos.filter((p) => p.estado === "REPORTADO").length,
+    pagosValidados: pagos.filter((p) => p.estado === "VALIDADO").length,
+    pagosRechazados: pagos.filter((p) => p.estado === "RECHAZADO").length,
+    soportesGenerados: soportesScope.length,
     mantenimientoAbierto: mantenimiento.filter(
       (m) => m.estado === "ABIERTO" || m.estado === "EN_PROGRESO"
     ).length,
