@@ -23,7 +23,7 @@ const MODULE_ACCESS: Record<AppModule, Rol[]> = {
   inmuebles: ["ADMIN", "ARRENDADOR"],
   contratos: ["ADMIN", "ARRENDADOR"],
   pagos: ["ADMIN", "ARRENDADOR", "ARRENDATARIO"],
-  servicios: ["ADMIN", "ARRENDADOR"],
+  servicios: ["ADMIN", "ARRENDADOR", "ARRENDATARIO"],
   mantenimiento: ["ADMIN", "ARRENDADOR", "ARRENDATARIO"],
   "no-renovacion": ["ADMIN", "ARRENDADOR", "ARRENDATARIO"],
   notificaciones: ["ADMIN", "ARRENDADOR", "ARRENDATARIO"],
@@ -32,6 +32,7 @@ const MODULE_ACCESS: Record<AppModule, Rol[]> = {
 };
 
 const PATH_MODULE: Record<string, AppModule> = {
+  "/onboarding": "dashboard",
   "/": "dashboard",
   "/inmuebles": "inmuebles",
   "/contratos": "contratos",
@@ -54,9 +55,9 @@ export const NAV_ITEMS: {
   { href: "/inmuebles", label: "Inmuebles", module: "inmuebles", roles: ["ADMIN", "ARRENDADOR"] },
   { href: "/contratos", label: "Contratos", module: "contratos", roles: ["ADMIN", "ARRENDADOR"] },
   { href: "/pagos", label: "Pagos reportados", module: "pagos", roles: ["ADMIN", "ARRENDADOR", "ARRENDATARIO"] },
-  { href: "/servicios", label: "Servicios públicos", module: "servicios", roles: ["ADMIN", "ARRENDADOR"] },
+  { href: "/servicios", label: "Servicios públicos", module: "servicios", roles: ["ADMIN", "ARRENDADOR", "ARRENDATARIO"] },
   { href: "/mantenimiento", label: "Mantenimiento", module: "mantenimiento", roles: ["ADMIN", "ARRENDADOR", "ARRENDATARIO"] },
-  { href: "/no-renovacion", label: "No renovación", module: "no-renovacion", roles: ["ADMIN", "ARRENDADOR", "ARRENDATARIO"] },
+  { href: "/no-renovacion", label: "No renovación", module: "no-renovacion", roles: ["ADMIN", "ARRENDADOR"] },
   { href: "/notificaciones", label: "Notificaciones", module: "notificaciones", roles: ["ADMIN", "ARRENDADOR", "ARRENDATARIO"] },
   { href: "/solicitudes-contrato", label: "Solicitudes contrato", module: "solicitudes-contrato", roles: ["ADMIN", "ARRENDATARIO"] },
   { href: "/usuarios", label: "Usuarios y roles", module: "usuarios", roles: ["ADMIN"] },

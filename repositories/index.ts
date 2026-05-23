@@ -44,6 +44,11 @@ import {
   usuariosSupabaseRepository,
   type UsuariosRepository,
 } from "@/repositories/usuarios.repository";
+import {
+  profileMockRepository,
+  profileSupabaseRepository,
+  type ProfileRepository,
+} from "@/repositories/profile.repository";
 
 function pick<T>(mock: T, supabase: T): T {
   return USE_MOCK_DATA ? mock : supabase;
@@ -83,4 +88,8 @@ export function getNotificacionesRepository(): NotificacionesRepository {
 
 export function getInvitacionesContratoRepository(): InvitacionesContratoRepository {
   return pick(invitacionesContratoMockRepository, invitacionesContratoSupabaseRepository);
+}
+
+export function getProfileRepository(): ProfileRepository {
+  return pick(profileMockRepository, profileSupabaseRepository);
 }

@@ -24,9 +24,9 @@ type AuthContextValue = {
   loading: boolean;
   authError: string | null;
   clearError: () => void;
-  loginWithGoogle: () => Promise<void>;
-  loginWithEmailPassword: (email: string, password: string) => Promise<void>;
-  registerWithEmailPassword: (email: string, password: string) => Promise<void>;
+  loginWithGoogle: () => Promise<string>;
+  loginWithEmailPassword: (email: string, password: string) => Promise<string>;
+  registerWithEmailPassword: (email: string, password: string) => Promise<string>;
   logout: () => Promise<void>;
 };
 
@@ -47,13 +47,14 @@ function mapFirebaseError(code: string): string {
   return map[code] ?? "No se pudo completar la autenticación.";
 }
 
-async function syncServerSession(user: FirebaseUser) {
-  await syncFirebaseSessionAction({
+async function syncServerSession(user: FirebaseUser): Promise<string> {
+  const result = await syncFirebaseSessionAction({
     email: user.email ?? "",
     displayName: user.displayName ?? user.email?.split("@")[0] ?? "Usuario",
     firebaseUid: user.uid,
     photoURL: user.photoURL ?? undefined,
   });
+  return result.redirectTo;
 }
 
 export function FirebaseAuthProvider({ children }: { children: ReactNode }) {
@@ -76,7 +77,7 @@ export function FirebaseAuthProvider({ children }: { children: ReactNode }) {
       setLoading(true);
       try {
         const cred = await fn();
-        await syncServerSession(cred.user);
+        return await syncServerSession(cred.user);
       } catch (e: unknown) {
         const code =
           e && typeof e === "object" && "code" in e

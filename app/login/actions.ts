@@ -16,6 +16,13 @@ export async function logoutAction(): Promise<void> {
 export async function redirectIfAuthenticated(nextPath?: string) {
   const session = await getSession();
   if (session) {
-    redirect(nextPath && nextPath.startsWith("/") ? nextPath : "/");
+    if (!session.usuario.perfilCompletado) {
+      redirect("/onboarding");
+    }
+    const dest =
+      nextPath && nextPath.startsWith("/") && nextPath !== "/login"
+        ? nextPath
+        : "/";
+    redirect(dest);
   }
 }

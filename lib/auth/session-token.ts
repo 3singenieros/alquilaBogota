@@ -4,7 +4,9 @@ const COOKIE_NAME = "alquila_session";
 
 export type SessionTokenPayload = {
   userId: string;
-  rol: Rol;
+  roles: Rol[];
+  rolActivo: Rol;
+  perfilCompletado: boolean;
   exp: number;
   email: string;
   displayName: string;
@@ -24,17 +26,41 @@ function decodePayload(encoded: string): SessionTokenPayload | null {
   try {
     const parsed = JSON.parse(
       Buffer.from(encoded, "base64url").toString("utf8")
-    ) as SessionTokenPayload;
+    ) as SessionTokenPayload & { rol?: Rol };
     if (
       !parsed.userId ||
-      !parsed.rol ||
       typeof parsed.exp !== "number" ||
       !parsed.email ||
       !parsed.firebaseUid
     ) {
       return null;
     }
-    return parsed;
+    const roles =
+      parsed.roles?.length > 0
+        ? parsed.roles
+        : parsed.rol
+          ? [parsed.rol]
+          : [];
+    const rolActivo = parsed.rolActivo ?? parsed.rol ?? roles[0];
+    if (!rolActivo && !parsed.perfilCompletado) {
+      return {
+        ...parsed,
+        roles,
+        rolActivo: "ARRENDATARIO",
+        perfilCompletado: Boolean(parsed.perfilCompletado),
+      };
+    }
+    return {
+      userId: parsed.userId,
+      roles,
+      rolActivo: rolActivo ?? "ARRENDATARIO",
+      perfilCompletado: Boolean(parsed.perfilCompletado),
+      exp: parsed.exp,
+      email: parsed.email,
+      displayName: parsed.displayName ?? parsed.email.split("@")[0],
+      firebaseUid: parsed.firebaseUid,
+      photoURL: parsed.photoURL,
+    };
   } catch {
     return null;
   }
@@ -57,7 +83,9 @@ function bufferToBase64Url(buffer: ArrayBuffer): string {
 
 export async function createSessionToken(params: {
   userId: string;
-  rol: Rol;
+  roles: Rol[];
+  rolActivo: Rol;
+  perfilCompletado: boolean;
   email: string;
   displayName: string;
   firebaseUid: string;

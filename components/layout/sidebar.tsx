@@ -32,17 +32,32 @@ const ICONS: Record<string, LucideIcon> = {
   "/usuarios": Users,
 };
 
+function navLabel(href: string, label: string, rolActivo: Rol): string {
+  if (href === "/solicitudes-contrato" && rolActivo === "ARRENDATARIO") {
+    return "Mis contratos / Solicitudes";
+  }
+  return label;
+}
+
 export function Sidebar({
   open,
   onClose,
-  rol,
+  rolActivo,
+  roles,
 }: {
   open: boolean;
   onClose: () => void;
-  rol: Rol;
+  rolActivo: Rol;
+  roles: Rol[];
 }) {
   const pathname = usePathname();
-  const nav = NAV_ITEMS.filter((item) => item.roles.includes(rol));
+  const nav = NAV_ITEMS.filter((item) => {
+    if (!item.roles.includes(rolActivo)) return false;
+    if (item.href === "/contratos" && roles.includes("ARRENDATARIO") && !roles.includes("ARRENDADOR") && rolActivo === "ARRENDATARIO") {
+      return false;
+    }
+    return true;
+  });
 
   return (
     <>
@@ -84,13 +99,13 @@ export function Sidebar({
                 )}
               >
                 <Icon className="h-4 w-4 shrink-0" />
-                {label}
+                {navLabel(href, label, rolActivo)}
               </Link>
             );
           })}
         </nav>
         <div className="border-t border-[var(--border)] p-4 text-xs text-slate-500">
-          Sesión: {rol}
+          Rol activo: {rolActivo}
         </div>
       </aside>
     </>

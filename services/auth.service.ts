@@ -3,16 +3,18 @@ import {
   canAccessModule,
   type AppModule,
 } from "@/lib/auth/permissions";
-import {
-  resolveRolFromEmail,
-  resolveUsuarioIdFromEmail,
-} from "@/lib/auth/role-resolver";
+import { profileToUsuario } from "@/lib/auth/profile-session";
 import {
   createSessionToken,
   SESSION_COOKIE_NAME,
   verifySessionToken,
+  type SessionTokenPayload,
 } from "@/lib/auth/session-token";
-import { getUsuariosRepository } from "@/repositories";
+import { getProfileRepository } from "@/repositories";
+import {
+  ensureProfileFromSessionPayload,
+  findProfileByLookup,
+} from "@/services/profile.service";
 import type { AuthSession } from "@/types/auth";
 import type { Rol, Usuario } from "@/types";
 import { cookies } from "next/headers";
@@ -24,64 +26,7 @@ export type FirebaseSessionInput = {
   photoURL?: string;
 };
 
-async function buildUsuarioFromPayload(
-  payload: Awaited<ReturnType<typeof verifySessionToken>> & object
-): Promise<Usuario | null> {
-  if (!payload) return null;
-  const repo = getUsuariosRepository();
-  const seed = await repo.findById(payload.userId);
-  if (seed && seed.activo && seed.rol === payload.rol) {
-    return {
-      ...seed,
-      nombre: payload.displayName || seed.nombre,
-      email: payload.email,
-      photoURL: payload.photoURL ?? seed.photoURL,
-    };
-  }
-
-  const byEmail = (await repo.findAll()).find(
-    (u) => u.email.toLowerCase() === payload.email.toLowerCase()
-  );
-  if (byEmail && byEmail.activo) {
-    return {
-      ...byEmail,
-      nombre: payload.displayName || byEmail.nombre,
-      email: payload.email,
-      photoURL: payload.photoURL ?? byEmail.photoURL,
-    };
-  }
-
-  return {
-    id: payload.userId,
-    code: payload.firebaseUid.slice(0, 12),
-    nombre: payload.displayName || payload.email.split("@")[0],
-    email: payload.email,
-    rol: payload.rol,
-    activo: true,
-    creadoEn: new Date().toISOString().slice(0, 10),
-    photoURL: payload.photoURL,
-  };
-}
-
-export async function syncFirebaseSession(
-  input: FirebaseSessionInput
-): Promise<{ ok: true; usuario: Usuario }> {
-  const email = input.email.trim().toLowerCase();
-  if (!email) {
-    throw new AuthError("Email de Firebase inválido", "UNAUTHORIZED");
-  }
-
-  const rol = await resolveRolFromEmail(email);
-  const userId = await resolveUsuarioIdFromEmail(email, input.firebaseUid);
-  const token = await createSessionToken({
-    userId,
-    rol,
-    email,
-    displayName: input.displayName || email.split("@")[0],
-    firebaseUid: input.firebaseUid,
-    photoURL: input.photoURL,
-  });
-
+async function persistSessionCookie(token: string) {
   const jar = await cookies();
   jar.set(SESSION_COOKIE_NAME, token, {
     httpOnly: true,
@@ -90,6 +35,82 @@ export async function syncFirebaseSession(
     path: "/",
     maxAge: 60 * 60 * 24 * 7,
   });
+}
+
+async function buildUsuarioFromPayload(
+  payload: SessionTokenPayload
+): Promise<Usuario | null> {
+  const profile =
+    (await ensureProfileFromSessionPayload(payload)) ??
+    (await findProfileByLookup({
+      userId: payload.userId,
+      email: payload.email,
+      firebaseUid: payload.firebaseUid,
+    }));
+
+  if (profile?.perfilCompletado) {
+    return profileToUsuario(profile, payload.photoURL);
+  }
+
+  return {
+    id: payload.userId,
+    code: payload.firebaseUid.slice(0, 12),
+    nombre: payload.displayName,
+    email: payload.email,
+    rol: payload.rolActivo,
+    roles: payload.roles,
+    rolActivo: payload.rolActivo,
+    activo: true,
+    creadoEn: new Date().toISOString().slice(0, 10),
+    photoURL: payload.photoURL,
+    perfilCompletado: false,
+    firebaseUid: payload.firebaseUid,
+  };
+}
+
+export async function syncFirebaseSession(
+  input: FirebaseSessionInput
+): Promise<{ ok: true; usuario: Usuario; redirectTo: string }> {
+  const email = input.email.trim().toLowerCase();
+  if (!email) {
+    throw new AuthError("Email de Firebase inválido", "UNAUTHORIZED");
+  }
+
+  const profile = await findProfileByLookup({
+    userId: input.firebaseUid,
+    email,
+    firebaseUid: input.firebaseUid,
+  });
+
+  const displayName = input.displayName || email.split("@")[0];
+
+  if (profile?.perfilCompletado) {
+    const token = await createSessionToken({
+      userId: profile.id,
+      roles: profile.roles,
+      rolActivo: profile.rolActivo,
+      perfilCompletado: true,
+      email: profile.email,
+      displayName: profile.nombre || displayName,
+      firebaseUid: input.firebaseUid,
+      photoURL: input.photoURL,
+    });
+    await persistSessionCookie(token);
+    const usuario = profileToUsuario(profile, input.photoURL);
+    return { ok: true, usuario, redirectTo: "/" };
+  }
+
+  const token = await createSessionToken({
+    userId: profile?.id ?? input.firebaseUid,
+    roles: profile?.roles ?? [],
+    rolActivo: profile?.rolActivo ?? "ARRENDATARIO",
+    perfilCompletado: false,
+    email,
+    displayName,
+    firebaseUid: input.firebaseUid,
+    photoURL: input.photoURL,
+  });
+  await persistSessionCookie(token);
 
   const usuario = await buildUsuarioFromPayload(
     (await verifySessionToken(token))!
@@ -98,7 +119,35 @@ export async function syncFirebaseSession(
     throw new AuthError("No se pudo crear la sesión", "UNAUTHORIZED");
   }
 
-  return { ok: true, usuario };
+  return { ok: true, usuario, redirectTo: "/onboarding" };
+}
+
+export async function refreshSessionFromProfile(
+  ref: { profileId: string; email: string; firebaseUid?: string },
+  photoURL?: string
+): Promise<Usuario> {
+  const profile =
+    (await getProfileRepository().findById(ref.profileId)) ??
+    (await findProfileByLookup({
+      userId: ref.profileId,
+      email: ref.email,
+      firebaseUid: ref.firebaseUid,
+    }));
+  if (!profile || !profile.perfilCompletado) {
+    throw new AuthError("Perfil incompleto", "UNAUTHORIZED");
+  }
+  const token = await createSessionToken({
+    userId: profile.id,
+    roles: profile.roles,
+    rolActivo: profile.rolActivo,
+    perfilCompletado: true,
+    email: profile.email,
+    displayName: profile.nombre,
+    firebaseUid: profile.firebaseUid,
+    photoURL,
+  });
+  await persistSessionCookie(token);
+  return profileToUsuario(profile, photoURL);
 }
 
 export async function logout(): Promise<void> {
@@ -122,6 +171,14 @@ export async function requireSession(): Promise<AuthSession> {
   const session = await getSession();
   if (!session) {
     throw new AuthError("Sesión no válida o expirada", "UNAUTHORIZED");
+  }
+  return session;
+}
+
+export async function requireCompletedProfile(): Promise<AuthSession> {
+  const session = await requireSession();
+  if (!session.usuario.perfilCompletado) {
+    throw new AuthError("Completa tu perfil para continuar", "FORBIDDEN");
   }
   return session;
 }

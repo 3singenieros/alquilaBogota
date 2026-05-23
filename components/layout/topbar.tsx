@@ -1,6 +1,7 @@
 "use client";
 
 import { LogoutButton } from "@/components/layout/logout-button";
+import { RoleControls } from "@/components/layout/role-controls";
 import type { Usuario } from "@/types";
 import { Menu, Search } from "lucide-react";
 
@@ -31,6 +32,7 @@ export function Topbar({
         />
       </div>
       <div className="ml-auto flex items-center gap-3">
+        <RoleControls usuario={usuario} />
         <div className="flex items-center gap-2 rounded-lg bg-slate-50 px-3 py-2">
           {usuario.photoURL ? (
             // eslint-disable-next-line @next/next/no-img-element
@@ -48,9 +50,6 @@ export function Topbar({
           <div className="hidden text-left sm:block">
             <p className="text-sm font-medium text-slate-900">{usuario.nombre}</p>
             <p className="text-xs text-slate-500">{usuario.email}</p>
-            <p className="text-[10px] font-medium uppercase tracking-wide text-indigo-600">
-              {usuario.rol}
-            </p>
           </div>
         </div>
         <LogoutButton />

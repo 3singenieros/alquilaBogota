@@ -1,3 +1,5 @@
+import { profileToUsuario } from "@/lib/auth/profile-session";
+import { seedProfiles } from "@/data/mock/seed-profiles";
 import type {
   ActividadReciente,
   Contrato,
@@ -12,47 +14,7 @@ import type {
   Usuario,
 } from "@/types";
 
-export const seedUsuarios: Usuario[] = [
-  {
-    id: "u-admin",
-    code: "u-admin",
-    nombre: "Ana Administradora",
-    email: "admin@demo.edu",
-    rol: "ADMIN",
-    telefono: "3001110001",
-    activo: true,
-    creadoEn: "2025-01-10",
-  },
-  {
-    id: "u-arrendador",
-    code: "u-arrendador",
-    nombre: "Carlos Arrendador",
-    email: "arrendador@demo.edu",
-    rol: "ARRENDADOR",
-    telefono: "3001110002",
-    activo: true,
-    creadoEn: "2025-01-10",
-  },
-  {
-    id: "u-arrendatario",
-    code: "u-arrendatario",
-    nombre: "María Arrendataria",
-    email: "arrendatario@demo.edu",
-    rol: "ARRENDATARIO",
-    telefono: "3001110003",
-    activo: true,
-    creadoEn: "2025-02-01",
-  },
-  {
-    id: "u-arrendador-2",
-    code: "u-arrendador-2",
-    nombre: "Luis Propietario",
-    email: "luis@demo.edu",
-    rol: "ARRENDADOR",
-    activo: true,
-    creadoEn: "2025-03-15",
-  },
-];
+export const seedUsuarios: Usuario[] = seedProfiles.map((p) => profileToUsuario(p));
 
 export const seedInmuebles: Inmueble[] = [
   {

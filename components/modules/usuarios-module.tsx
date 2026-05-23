@@ -50,10 +50,14 @@ export function UsuariosModule({
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const fd = new FormData(e.currentTarget);
+    const rol = fd.get("rol") as Rol;
     const payload = {
       nombre: fd.get("nombre") as string,
       email: fd.get("email") as string,
-      rol: fd.get("rol") as Rol,
+      rol,
+      roles: [rol],
+      rolActivo: rol,
+      perfilCompletado: true,
       telefono: (fd.get("telefono") as string) || undefined,
       activo: fd.get("activo") === "true",
     };

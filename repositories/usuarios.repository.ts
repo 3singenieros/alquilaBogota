@@ -78,15 +78,22 @@ export const usuariosSupabaseRepository: UsuariosRepository = {
 };
 
 function mapRow(r: Record<string, unknown>): Usuario {
+  const rol = r.rol as Usuario["rol"];
+  const roles = (r.roles as Usuario["roles"] | undefined) ?? [rol];
+  const rolActivo = (r.rol_activo as Usuario["rolActivo"] | undefined) ?? rol;
   return {
     id: r.id as string,
     code: r.code as string,
     nombre: r.nombre as string,
     email: r.email as string,
-    rol: r.rol as Usuario["rol"],
+    rol: rolActivo,
+    roles,
+    rolActivo,
     telefono: r.telefono as string | undefined,
     activo: Boolean(r.activo),
     creadoEn: r.creado_en as string,
+    perfilCompletado: Boolean(r.perfil_completado ?? true),
+    firebaseUid: r.firebase_uid as string | undefined,
   };
 }
 
@@ -95,8 +102,12 @@ function toRow(i: Partial<Usuario>) {
     nombre: i.nombre,
     email: i.email,
     rol: i.rol,
+    roles: i.roles,
+    rol_activo: i.rolActivo,
     telefono: i.telefono,
     activo: i.activo,
     creado_en: i.creadoEn,
+    perfil_completado: i.perfilCompletado,
+    firebase_uid: i.firebaseUid,
   };
 }

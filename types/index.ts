@@ -35,11 +35,16 @@ export interface Usuario {
   code: string;
   nombre: string;
   email: string;
+  /** Rol activo en la sesión (alias de rolActivo). */
   rol: Rol;
+  roles: Rol[];
+  rolActivo: Rol;
   telefono?: string;
   activo: boolean;
   creadoEn: string;
   photoURL?: string;
+  perfilCompletado: boolean;
+  firebaseUid?: string;
 }
 
 export interface Inmueble {

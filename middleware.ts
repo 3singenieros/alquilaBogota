@@ -1,6 +1,4 @@
-import {
-  canAccessPath,
-} from "@/lib/auth/permissions";
+import { canAccessPath } from "@/lib/auth/permissions";
 import {
   SESSION_COOKIE_NAME,
   verifySessionToken,
@@ -28,6 +26,17 @@ export async function middleware(request: NextRequest) {
 
   if (pathname === "/login") {
     if (payload) {
+      const dest = payload.perfilCompletado ? "/" : "/onboarding";
+      return NextResponse.redirect(new URL(dest, request.url));
+    }
+    return NextResponse.next();
+  }
+
+  if (pathname === "/onboarding") {
+    if (!payload) {
+      return NextResponse.redirect(new URL("/login", request.url));
+    }
+    if (payload.perfilCompletado) {
       return NextResponse.redirect(new URL("/", request.url));
     }
     return NextResponse.next();
@@ -45,7 +54,11 @@ export async function middleware(request: NextRequest) {
     return response;
   }
 
-  if (!canAccessPath(payload.rol, pathname)) {
+  if (!payload.perfilCompletado) {
+    return NextResponse.redirect(new URL("/onboarding", request.url));
+  }
+
+  if (!canAccessPath(payload.rolActivo, pathname)) {
     return NextResponse.redirect(new URL("/sin-acceso", request.url));
   }
 
@@ -53,7 +66,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: [
-    "/((?!_next/static|_next/image|favicon.ico).*)",
-  ],
+  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
 };

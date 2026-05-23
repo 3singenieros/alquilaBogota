@@ -10,23 +10,36 @@ import { useState } from "react";
 
 export function LoginForm({ nextPath }: { nextPath?: string }) {
   const router = useRouter();
-  const { loginWithGoogle, loginWithEmailPassword, registerWithEmailPassword, loading, authError, clearError } =
-    useFirebaseAuth();
+  const {
+    loginWithGoogle,
+    loginWithEmailPassword,
+    registerWithEmailPassword,
+    loading,
+    authError,
+    clearError,
+  } = useFirebaseAuth();
   const [mode, setMode] = useState<"login" | "register">("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+
+  async function afterAuth(redirectTo: string) {
+    const dest =
+      redirectTo === "/" && nextPath?.startsWith("/") && nextPath !== "/login"
+        ? nextPath
+        : redirectTo;
+    router.push(dest);
+    router.refresh();
+  }
 
   async function handleEmailSubmit(e: React.FormEvent) {
     e.preventDefault();
     clearError();
     try {
-      if (mode === "login") {
-        await loginWithEmailPassword(email, password);
-      } else {
-        await registerWithEmailPassword(email, password);
-      }
-      router.push(nextPath ?? "/");
-      router.refresh();
+      const redirectTo =
+        mode === "login"
+          ? await loginWithEmailPassword(email, password)
+          : await registerWithEmailPassword(email, password);
+      await afterAuth(redirectTo);
     } catch {
       /* authError set in provider */
     }
@@ -35,9 +48,8 @@ export function LoginForm({ nextPath }: { nextPath?: string }) {
   async function handleGoogle() {
     clearError();
     try {
-      await loginWithGoogle();
-      router.push(nextPath ?? "/");
-      router.refresh();
+      const redirectTo = await loginWithGoogle();
+      await afterAuth(redirectTo);
     } catch {
       /* handled */
     }
@@ -124,13 +136,14 @@ export function LoginForm({ nextPath }: { nextPath?: string }) {
 
       <details className="mt-6 text-xs text-slate-500">
         <summary className="cursor-pointer font-medium text-slate-600">
-          Roles demo (por email)
+          Cuentas demo (perfil ya configurado)
         </summary>
         <ul className="mt-2 space-y-1 rounded-lg bg-slate-50 p-3 leading-relaxed">
-          <li>admin@… → ADMIN</li>
-          <li>arrendador@… → ARRENDADOR</li>
-          <li>arrendatario@demo.edu → ARRENDATARIO</li>
-          <li>nuevo.arrendatario@demo.edu → solicitud pendiente</li>
+          <li>admin@demo.edu → ADMIN</li>
+          <li>arrendador@demo.edu → solo arrendador</li>
+          <li>arrendatario@demo.edu → solo arrendatario</li>
+          <li>dual@demo.edu → ambos roles</li>
+          <li>Cuenta nueva → onboarding de roles</li>
         </ul>
       </details>
     </div>

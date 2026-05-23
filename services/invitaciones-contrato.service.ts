@@ -14,9 +14,21 @@ export async function listarInvitacionesPorEmail(email: string) {
   return items.filter((i) => i.emailInvitado.toLowerCase() === normalized);
 }
 
+export async function contarInvitacionesPendientesPorEmail(email: string) {
+  const items = await listarInvitacionesPorEmail(email);
+  return items.filter((i) => i.estado === "PENDIENTE").length;
+}
+
 export async function listarSolicitudesContratoParaSesion() {
   const { usuario } = await requireSession();
-  assertModuleAccess(usuario.rol, "solicitudes-contrato");
+  const roles = usuario.roles ?? [usuario.rol];
+  if (!roles.includes("ARRENDATARIO") && usuario.rol !== "ADMIN") {
+    throw new AuthError(
+      "Necesitas el rol arrendatario para ver solicitudes de contrato",
+      "FORBIDDEN"
+    );
+  }
+  assertModuleAccess(usuario.rolActivo ?? usuario.rol, "solicitudes-contrato");
   return listarInvitacionesPorEmail(usuario.email);
 }
 

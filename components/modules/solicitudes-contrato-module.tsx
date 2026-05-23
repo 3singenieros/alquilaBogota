@@ -21,11 +21,13 @@ export function SolicitudesContratoModule({
   contratos,
   inmuebles,
   usuarios,
+  showRoleHint = false,
 }: {
   invitaciones: InvitacionContrato[];
   contratos: Contrato[];
   inmuebles: Inmueble[];
   usuarios: Usuario[];
+  showRoleHint?: boolean;
 }) {
   const inmueblesMap = useMemo(() => inmueblesById(inmuebles), [inmuebles]);
   const usuariosMap = useMemo(() => usuariosById(usuarios), [usuarios]);
@@ -78,6 +80,13 @@ export function SolicitudesContratoModule({
         title="Solicitudes de contrato"
         description="Invitaciones enviadas a tu correo — acepta o rechaza para confirmar el arrendamiento"
       />
+      {showRoleHint ? (
+        <p className="mb-4 rounded-lg border border-indigo-200 bg-indigo-50 px-4 py-3 text-sm text-indigo-900">
+          Tienes invitaciones en este correo. Si operas como arrendador, activa también el
+          rol arrendatario desde la barra superior para gestionar solicitudes cuando cambies
+          de rol.
+        </p>
+      ) : null}
       <Table>
         <thead>
           <tr>
