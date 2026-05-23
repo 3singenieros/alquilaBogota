@@ -9,7 +9,20 @@ export function revalidateInmuebleDependents() {
 
 /** Rutas que dependen del listado de contratos. */
 export function revalidateContratoDependents() {
-  for (const path of ["/contratos", "/pagos", "/no-renovacion", "/"]) {
+  for (const path of [
+    "/contratos",
+    "/pagos",
+    "/no-renovacion",
+    "/notificaciones",
+    "/solicitudes-contrato",
+    "/",
+  ]) {
+    revalidatePath(path);
+  }
+}
+
+export function revalidateNotificacionDependents() {
+  for (const path of ["/notificaciones", "/no-renovacion", "/"]) {
     revalidatePath(path);
   }
 }

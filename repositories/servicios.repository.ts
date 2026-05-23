@@ -80,6 +80,8 @@ function mapRow(r: Record<string, unknown>): ServicioPublico {
     code: r.code as string,
     inmuebleId: r.inmueble_id as string,
     tipo: r.tipo as string,
+    empresaPrestadora: (r.empresa_prestadora as string) ?? "",
+    numeroCuentaServicio: (r.numero_cuenta_servicio as string) ?? "",
     periodo: r.periodo as string,
     monto: Number(r.monto),
     vencimiento: r.vencimiento as string,
@@ -92,6 +94,8 @@ function toRow(i: Partial<ServicioPublico>) {
   return {
     inmueble_id: i.inmuebleId,
     tipo: i.tipo,
+    empresa_prestadora: i.empresaPrestadora,
+    numero_cuenta_servicio: i.numeroCuentaServicio,
     periodo: i.periodo,
     monto: i.monto,
     vencimiento: i.vencimiento,

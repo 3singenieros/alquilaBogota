@@ -4,25 +4,37 @@ import {
   getActividadReciente,
   getDashboardResumen,
   getIncidencias,
+  resumenContratoAlerta,
 } from "@/services/dashboard.service";
 import { requireSession } from "@/services/auth.service";
 import type { Rol } from "@/types";
 import { formatCurrency, formatDate } from "@/lib/utils";
+import Link from "next/link";
 import {
   AlertTriangle,
+  Bell,
   Building2,
   FileText,
   Hammer,
   Receipt,
+  Zap,
 } from "lucide-react";
 
 const STATS_BY_ROL: Record<
   Rol,
-  Array<"inmuebles" | "contratos" | "pagos" | "mantenimiento">
+  Array<
+    | "inmuebles"
+    | "contratos"
+    | "pagos"
+    | "mantenimiento"
+    | "servicios"
+    | "notificaciones"
+    | "solicitudes"
+  >
 > = {
-  ADMIN: ["inmuebles", "contratos", "pagos", "mantenimiento"],
-  ARRENDADOR: ["inmuebles", "contratos", "pagos", "mantenimiento"],
-  ARRENDATARIO: ["pagos", "mantenimiento"],
+  ADMIN: ["inmuebles", "contratos", "pagos", "mantenimiento", "servicios", "notificaciones", "solicitudes"],
+  ARRENDADOR: ["inmuebles", "contratos", "pagos", "mantenimiento", "servicios", "notificaciones"],
+  ARRENDATARIO: ["pagos", "mantenimiento", "notificaciones", "solicitudes"],
 };
 
 export default async function DashboardPage() {
@@ -46,7 +58,7 @@ export default async function DashboardPage() {
       key: "contratos" as const,
       label: "Contratos activos",
       value: resumen.contratosActivos,
-      sub: "Vigentes",
+      sub: `${resumen.contratosProximosVencerCount} próximos a vencer`,
       icon: FileText,
       color: "text-emerald-600 bg-emerald-50",
     },
@@ -66,6 +78,30 @@ export default async function DashboardPage() {
       icon: Hammer,
       color: "text-sky-600 bg-sky-50",
     },
+    {
+      key: "servicios" as const,
+      label: "Servicios vencidos",
+      value: resumen.serviciosVencidos,
+      sub: "Recibos",
+      icon: Zap,
+      color: "text-red-600 bg-red-50",
+    },
+    {
+      key: "notificaciones" as const,
+      label: "Notificaciones pendientes",
+      value: resumen.notificacionesPendientes,
+      sub: "Envío simulado",
+      icon: Bell,
+      color: "text-violet-600 bg-violet-50",
+    },
+    {
+      key: "solicitudes" as const,
+      label: "Solicitudes pendientes",
+      value: resumen.solicitudesPendientes,
+      sub: "Invitaciones de contrato",
+      icon: Bell,
+      color: "text-sky-600 bg-sky-50",
+    },
   ];
 
   const allowed = STATS_BY_ROL[session.usuario.rol];
@@ -80,7 +116,7 @@ export default async function DashboardPage() {
         </p>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         {stats.map((s) => (
           <Card key={s.label}>
             <CardContent className="flex items-start justify-between pt-5">
@@ -108,6 +144,100 @@ export default async function DashboardPage() {
         </Card>
       )}
 
+      <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-3">
+        {session.usuario.rol !== "ARRENDATARIO" && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Pendientes de confirmación</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-3xl font-bold text-amber-600">
+                {resumen.contratosPendientesConfirmacionCount}
+              </p>
+              <Link href="/contratos" className="mt-2 inline-block text-xs text-indigo-600">
+                Ver contratos
+              </Link>
+            </CardContent>
+          </Card>
+        )}
+        {session.usuario.rol === "ARRENDATARIO" && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Mis solicitudes pendientes</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-3xl font-bold text-indigo-600">{resumen.solicitudesPendientes}</p>
+              <Link
+                href="/solicitudes-contrato"
+                className="mt-2 inline-block text-xs text-indigo-600"
+              >
+                Revisar invitaciones
+              </Link>
+            </CardContent>
+          </Card>
+        )}
+        {session.usuario.rol !== "ARRENDATARIO" && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Contratos rechazados</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-3xl font-bold text-red-600">{resumen.contratosRechazadosCount}</p>
+            </CardContent>
+          </Card>
+        )}
+      </div>
+
+      <div className="grid gap-4 lg:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Contratos próximos a vencer (90 días)</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {resumen.contratosProximosVencer.length === 0 ? (
+              <p className="text-sm text-slate-500">Sin alertas de vencimiento.</p>
+            ) : (
+              resumen.contratosProximosVencer.map((c) => (
+                <div
+                  key={c.id}
+                  className="flex items-center justify-between rounded-lg border border-amber-100 bg-amber-50/50 px-3 py-2 text-sm"
+                >
+                  <span>{resumenContratoAlerta(c)}</span>
+                  <Link href="/contratos" className="text-xs font-medium text-indigo-600">
+                    Ver
+                  </Link>
+                </div>
+              ))
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Preavisos vencidos (prórroga automática)</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {resumen.preavisosVencidos.length === 0 ? (
+              <p className="text-sm text-slate-500">Sin preavisos vencidos.</p>
+            ) : (
+              resumen.preavisosVencidos.map((c) => (
+                <div
+                  key={c.id}
+                  className="flex items-center justify-between rounded-lg border border-red-100 bg-red-50/50 px-3 py-2 text-sm"
+                >
+                  <span>
+                    {c.code} — límite {formatDate(c.fechaLimitePreaviso)}
+                  </span>
+                  <Link href="/no-renovacion" className="text-xs font-medium text-indigo-600">
+                    Gestionar
+                  </Link>
+                </div>
+              ))
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
       <div className="grid gap-6 lg:grid-cols-2">
         <Card>
           <CardHeader>
@@ -116,7 +246,7 @@ export default async function DashboardPage() {
           <CardContent className="space-y-4">
             {actividad.map((a) => (
               <div key={a.id} className="flex gap-3 border-b border-[var(--border)] pb-3 last:border-0 last:pb-0">
-                <div className="mt-0.5 h-2 w-2 shrink-0 rounded-full bg-indigo-500" />
+                <div className="mt-0.5 h-2 w-2 shrink-0 rounded-full bg-indigo-500" /> 
                 <div>
                   <p className="text-sm font-medium text-slate-900">{a.descripcion}</p>
                   <p className="text-xs text-slate-500">

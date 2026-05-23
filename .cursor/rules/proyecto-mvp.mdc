@@ -1,37 +1,84 @@
 ---
-description: Reglas del prototipo académico de gestión de arrendamientos
+description: Reglas del prototipo académico de gestión y trazabilidad de arrendamientos
 alwaysApply: true
 ---
 
 # Prototipo MVP — Gestión de Arrendamientos
 
 ## Propósito
-- Prototipo académico para tesis de Ingeniería de Software.
-- Priorizar velocidad, claridad y demostrabilidad sobre arquitectura empresarial.
-- Gestiona arrendamientos **ya activos**. NO es marketplace.
+- Prototipo académico para **tesis de Ingeniería de Software**: gestión y **trazabilidad** de arrendamientos **ya activos**.
+- Priorizar **demo funcional**, estabilidad, claridad y coherencia con la tesis sobre arquitectura empresarial.
+- **NO** es marketplace, **NO** es ERP inmobiliario, **NO** convierte el alcance en producto comercial completo.
 
-## Límites funcionales
-- NO procesar pagos reales: solo **pagos reportados** con comprobante.
-- NO firma digital real: solo adjuntar documentos.
-- Login obligatorio con credenciales mock; sesión en cookie firmada; autorización por rol en middleware y services (ver docs/AUTENTICACION.md).
+## Límites funcionales (fuera de alcance)
+- **NO** procesar pagos reales: solo **pagos reportados** con comprobante adjunto.
+- **NO** firma digital real: solo adjuntar o referenciar documentos.
+- **NO** pasarela de pagos, **NO** OCR, **NO** generación legal automática avanzada.
+- **NO** envío real de correo en esta etapa (ver notificaciones simuladas).
+- Login con credenciales mock; sesión en cookie firmada; autorización por rol en middleware y services (ver `docs/AUTENTICACION.md`).
 
 ## Módulos obligatorios
-Dashboard, Inmuebles, Contratos, Pagos reportados, Servicios públicos, Mantenimiento, No renovación, Usuarios y roles.
+Dashboard, Inmuebles, Contratos, Pagos reportados, Servicios públicos, Mantenimiento, No renovación, Usuarios y roles, **Notificaciones** (historial y simulación).
+
+## Trazabilidad contractual (eje del dominio)
+- El sistema debe **fortalecer la trazabilidad contractual**: qué se acordó, vigencia, preavisos, garantías, documentos y eventos asociados.
+- **Un inmueble solo puede tener un contrato en estado `ACTIVO`** a la vez; validar en `services`, no solo en UI.
+- El **canon mensual pactado vive en el `Contrato`**, no en el `Inmueble`. El inmueble describe la propiedad (ubicación, tipo, estado operativo); las condiciones económicas del arriendo son del contrato.
+- Pagos reportados, no renovación y dashboard deben derivar montos y plazos del **contrato activo**, no de un canon duplicado en inmueble.
+
+## Contratos — información mínima alineada a contratos reales
+Además de vigencia, partes y canon, el modelo debe contemplar (mock primero, schema preparado):
+- **Codeudor o fiador** (nombre, contacto o referencia documental).
+- **Depósito o garantía** (monto, condiciones breves).
+- **Prórroga automática** (sí/no y condiciones).
+- **Fecha límite de preaviso** (para no renovación y alertas).
+- **Reajuste del canon** (regla o periodicidad descriptiva; no motor legal complejo).
+- **Inventario básico de entrega** (texto o checklist resumido).
+- **Documentos asociados** (URLs o referencias demo; sin firma digital).
+
+## No renovación
+Debe relacionarse explícitamente con:
+- **Fecha de vencimiento** del contrato (`fechaFin`).
+- **Fecha límite de preaviso** del contrato.
+- **Estado** de la solicitud/notificación (`EstadoNoRenovacion`).
+- **Evidencia e historial** de envío (registro simulado, no correo real).
+
+## Notificaciones (fase simulada)
+- **NO** enviar correos reales todavía.
+- Registrar **historial de notificaciones** (destinatario, tipo, contexto, fecha, estado simulado).
+- Permitir **preparar o simular** notificación hacia arrendador y arrendatario.
+- Arquitectura lista para integración futura (p. ej. `lib/notifications/` + servicio + repositorio; adaptador mock ahora, proveedor real después).
+
+Eventos que deben poder asociarse a una notificación:
+- Contrato próximo a vencer.
+- Aviso de no renovación.
+- Pago reportado.
+- Recibo de servicio público vencido.
+- Incidencia de mantenimiento.
+- Reajuste de canon.
 
 ## Capas (obligatorio)
-- `/types` — modelos TypeScript
-- `/lib` — utilidades, cliente Supabase, config
-- `/repositories` o `/data` — acceso a datos (mock o Supabase)
-- `/services` — lógica de negocio; los componentes NO acceden a datos directamente
-- `/components` — UI
-- `/app` — rutas App Router
+- `/app` — rutas App Router y Server Actions delgadas.
+- `/components` — UI; sin lógica de negocio ni acceso a datos.
+- `/services` — reglas de negocio, autorización, orquestación.
+- `/repositories` — acceso a datos (mock activo; Supabase preparado).
+- `/types` — modelos TypeScript.
+- `/data/mock` — seed y datos en memoria.
+- `/lib` — utilidades, auth, códigos de entidad, notificaciones, config.
 
-## Persistencia
-- Iniciar con mock; arquitectura lista para Supabase (auth, DB, storage).
+## Persistencia y Supabase
+- **Usar mock en memoria** como fuente activa (`USE_MOCK_DATA` o equivalente).
+- **NO conectar Supabase** en runtime en esta fase, salvo mantener tipos, interfaces de repositorio, factory y `supabase/schema.sql` alineados al dominio.
 - Variables en `.env.local`; nunca commitear secretos.
-- CRUD vía repositorios; carga de archivos vía Supabase Storage cuando esté activo.
+- CRUD vía repositorios; archivos vía Storage solo cuando se active Supabase.
 
 ## UI
 - Tailwind, estilo SaaS/dashboard moderno.
 - Tablas con filtros, badges de estado, modales crear/editar.
-- Sin microservicios ni backend complejo fuera de Supabase.
+- Códigos legibles por entidad (`code`) en tablas; autogenerados en creación.
+- Sin microservicios ni backend complejo fuera de Next.js + capas del proyecto.
+
+## Criterios de implementación
+- Cambios pequeños, demostrables en demo y defendibles en tesis.
+- Validaciones de negocio en `services`; mensajes claros en UI.
+- Evitar sobreingeniería: sin colas, sin workers, sin integraciones externas reales en esta etapa.

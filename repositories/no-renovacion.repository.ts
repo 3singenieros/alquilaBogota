@@ -84,6 +84,12 @@ function mapRow(r: Record<string, unknown>): NoRenovacion {
     estado: r.estado as NoRenovacion["estado"],
     documentoUrl: r.documento_url as string | undefined,
     solicitadoPorId: r.solicitado_por_id as string,
+    fechaLimitePreaviso: r.fecha_limite_preaviso as string,
+    fechaEnvioNotificacion: r.fecha_envio_notificacion as string | undefined,
+    destinatarioArrendadorEmail: r.destinatario_arrendador_email as string,
+    destinatarioArrendatarioEmail: r.destinatario_arrendatario_email as string,
+    estadoNotificacion: r.estado_notificacion as NoRenovacion["estadoNotificacion"],
+    observacionesNotificacion: r.observaciones_notificacion as string | undefined,
   };
 }
 
@@ -95,5 +101,11 @@ function toRow(i: Partial<NoRenovacion>) {
     estado: i.estado,
     documento_url: i.documentoUrl,
     solicitado_por_id: i.solicitadoPorId,
+    fecha_limite_preaviso: i.fechaLimitePreaviso,
+    fecha_envio_notificacion: i.fechaEnvioNotificacion,
+    destinatario_arrendador_email: i.destinatarioArrendadorEmail,
+    destinatario_arrendatario_email: i.destinatarioArrendatarioEmail,
+    estado_notificacion: i.estadoNotificacion,
+    observaciones_notificacion: i.observacionesNotificacion,
   };
 }

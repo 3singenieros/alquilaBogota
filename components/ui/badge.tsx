@@ -30,11 +30,18 @@ export function StatusBadge({
 
 export function estadoVariant(estado: string): keyof typeof variants {
   const map: Record<string, keyof typeof variants> = {
+    CONFIRMADO: "success",
+    PENDIENTE_CONFIRMACION: "warning",
+    BORRADOR: "neutral",
+    RECHAZADO: "danger",
+    CANCELADO: "neutral",
+    ACEPTADA: "success",
+    RECHAZADA: "danger",
+    EXPIRADA: "neutral",
     ACTIVO: "success",
     VALIDADO: "success",
     PAGADO: "success",
     RESUELTO: "success",
-    ACEPTADA: "success",
     DISPONIBLE: "info",
     REPORTADO: "warning",
     PENDIENTE: "warning",
@@ -42,13 +49,15 @@ export function estadoVariant(estado: string): keyof typeof variants {
     EN_REVISION: "warning",
     SOLICITADA: "warning",
     VENCIDO: "danger",
-    RECHAZADO: "danger",
-    RECHAZADA: "danger",
     ABIERTO: "info",
     ARRENDADO: "primary",
     MANTENIMIENTO: "warning",
     TERMINADO: "neutral",
     CERRADO: "neutral",
+    SIMULADA: "success",
+    DEVUELTO: "success",
+    APLICADO: "primary",
+    ERROR: "danger",
   };
   return map[estado] ?? "neutral";
 }

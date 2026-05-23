@@ -30,6 +30,16 @@ import {
   type ServiciosRepository,
 } from "@/repositories/servicios.repository";
 import {
+  notificacionesMockRepository,
+  notificacionesSupabaseRepository,
+  type NotificacionesRepository,
+} from "@/repositories/notificaciones.repository";
+import {
+  invitacionesContratoMockRepository,
+  invitacionesContratoSupabaseRepository,
+  type InvitacionesContratoRepository,
+} from "@/repositories/invitaciones-contrato.repository";
+import {
   usuariosMockRepository,
   usuariosSupabaseRepository,
   type UsuariosRepository,
@@ -65,4 +75,12 @@ export function getNoRenovacionRepository(): NoRenovacionRepository {
 
 export function getUsuariosRepository(): UsuariosRepository {
   return pick(usuariosMockRepository, usuariosSupabaseRepository);
+}
+
+export function getNotificacionesRepository(): NotificacionesRepository {
+  return pick(notificacionesMockRepository, notificacionesSupabaseRepository);
+}
+
+export function getInvitacionesContratoRepository(): InvitacionesContratoRepository {
+  return pick(invitacionesContratoMockRepository, invitacionesContratoSupabaseRepository);
 }

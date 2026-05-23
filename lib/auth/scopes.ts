@@ -22,7 +22,12 @@ export function filterContratos(items: Contrato[], user: Usuario): Contrato[] {
     return items.filter((c) => c.arrendadorId === user.id);
   }
   if (user.rol === "ARRENDATARIO") {
-    return items.filter((c) => c.arrendatarioId === user.id);
+    const email = user.email.toLowerCase();
+    return items.filter(
+      (c) =>
+        c.arrendatarioId === user.id ||
+        c.emailArrendatario?.toLowerCase() === email
+    );
   }
   return [];
 }

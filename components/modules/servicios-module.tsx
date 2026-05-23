@@ -2,6 +2,7 @@
 
 import { listarInmueblesFormAction } from "@/app/(dashboard)/inmuebles/actions";
 import { crearServicioAction } from "@/app/(dashboard)/servicios/actions";
+import { SimulatedFileInput } from "@/components/shared/simulated-file-input";
 import { FilterBar } from "@/components/shared/filter-bar";
 import { StatusBadge, estadoVariant } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -63,10 +64,13 @@ export function ServiciosModule({
     const payload = {
       inmuebleId: fd.get("inmuebleId") as string,
       tipo: fd.get("tipo") as string,
+      empresaPrestadora: fd.get("empresaPrestadora") as string,
+      numeroCuentaServicio: fd.get("numeroCuentaServicio") as string,
       periodo: fd.get("periodo") as string,
       monto: Number(fd.get("monto")),
       vencimiento: fd.get("vencimiento") as string,
       estado: (fd.get("estado") as EstadoServicio) || "PENDIENTE",
+      comprobanteUrl: (fd.get("comprobanteUrl") as string) || undefined,
     };
     startTransition(async () => {
       const created = await crearServicioAction(payload);
@@ -102,6 +106,8 @@ export function ServiciosModule({
             <Th>Código</Th>
             <Th>Inmueble</Th>
             <Th>Tipo</Th>
+            <Th>Empresa</Th>
+            <Th>Cuenta</Th>
             <Th>Periodo</Th>
             <Th>Monto</Th>
             <Th>Vencimiento</Th>
@@ -114,6 +120,8 @@ export function ServiciosModule({
               <Td className="font-mono text-xs text-slate-600">{s.code}</Td>
               <Td>{inmuebleDisplayFromId(s.inmuebleId, inmueblesMap)}</Td>
               <Td>{s.tipo}</Td>
+              <Td className="text-xs">{s.empresaPrestadora}</Td>
+              <Td className="font-mono text-xs">{s.numeroCuentaServicio}</Td>
               <Td>{s.periodo}</Td>
               <Td>{formatCurrency(s.monto)}</Td>
               <Td>{formatDate(s.vencimiento)}</Td>
@@ -146,13 +154,22 @@ export function ServiciosModule({
             </Select>
           </FormField>
           <FormField label="Tipo"><Input name="tipo" defaultValue="Agua" required /></FormField>
-          <FormField label="Periodo"><Input name="periodo" defaultValue="2025-06" required /></FormField>
+          <FormField label="Empresa prestadora">
+            <Input name="empresaPrestadora" placeholder="EAAB, Enel, Vanti..." required />
+          </FormField>
+          <FormField label="Número de cuenta">
+            <Input name="numeroCuentaServicio" placeholder="AG-000000" required />
+          </FormField>
+          <FormField label="Periodo"><Input name="periodo" defaultValue="2026-06" required /></FormField>
           <FormField label="Monto"><Input name="monto" type="number" required /></FormField>
           <FormField label="Vencimiento"><Input name="vencimiento" type="date" required /></FormField>
           <FormField label="Estado">
             <Select name="estado" defaultValue="PENDIENTE">
               {ESTADOS.map((e) => <option key={e} value={e}>{e}</option>)}
             </Select>
+          </FormField>
+          <FormField label="Comprobante">
+            <SimulatedFileInput name="comprobanteUrl" label="Recibo (simulado)" />
           </FormField>
         </form>
       </Modal>

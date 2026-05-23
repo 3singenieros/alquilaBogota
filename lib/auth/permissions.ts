@@ -8,6 +8,8 @@ export type AppModule =
   | "servicios"
   | "mantenimiento"
   | "no-renovacion"
+  | "notificaciones"
+  | "solicitudes-contrato"
   | "usuarios";
 
 export type ModulePermissions = {
@@ -24,6 +26,8 @@ const MODULE_ACCESS: Record<AppModule, Rol[]> = {
   servicios: ["ADMIN", "ARRENDADOR"],
   mantenimiento: ["ADMIN", "ARRENDADOR", "ARRENDATARIO"],
   "no-renovacion": ["ADMIN", "ARRENDADOR", "ARRENDATARIO"],
+  notificaciones: ["ADMIN", "ARRENDADOR", "ARRENDATARIO"],
+  "solicitudes-contrato": ["ADMIN", "ARRENDATARIO"],
   usuarios: ["ADMIN"],
 };
 
@@ -35,6 +39,8 @@ const PATH_MODULE: Record<string, AppModule> = {
   "/servicios": "servicios",
   "/mantenimiento": "mantenimiento",
   "/no-renovacion": "no-renovacion",
+  "/notificaciones": "notificaciones",
+  "/solicitudes-contrato": "solicitudes-contrato",
   "/usuarios": "usuarios",
 };
 
@@ -51,6 +57,8 @@ export const NAV_ITEMS: {
   { href: "/servicios", label: "Servicios públicos", module: "servicios", roles: ["ADMIN", "ARRENDADOR"] },
   { href: "/mantenimiento", label: "Mantenimiento", module: "mantenimiento", roles: ["ADMIN", "ARRENDADOR", "ARRENDATARIO"] },
   { href: "/no-renovacion", label: "No renovación", module: "no-renovacion", roles: ["ADMIN", "ARRENDADOR", "ARRENDATARIO"] },
+  { href: "/notificaciones", label: "Notificaciones", module: "notificaciones", roles: ["ADMIN", "ARRENDADOR", "ARRENDATARIO"] },
+  { href: "/solicitudes-contrato", label: "Solicitudes contrato", module: "solicitudes-contrato", roles: ["ADMIN", "ARRENDATARIO"] },
   { href: "/usuarios", label: "Usuarios y roles", module: "usuarios", roles: ["ADMIN"] },
 ];
 
@@ -85,7 +93,10 @@ export function getModulePermissions(rol: Rol, module: AppModule): ModulePermiss
   // ARRENDATARIO
   return {
     canCreate: ["pagos", "mantenimiento", "no-renovacion"].includes(module),
-    canEdit: module === "mantenimiento" || module === "no-renovacion",
+    canEdit:
+      module === "mantenimiento" ||
+      module === "no-renovacion" ||
+      module === "solicitudes-contrato",
     canDelete: false,
   };
 }

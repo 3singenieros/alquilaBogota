@@ -2,6 +2,7 @@
 
 import { listarInmueblesFormAction } from "@/app/(dashboard)/inmuebles/actions";
 import { crearMantenimientoAction } from "@/app/(dashboard)/mantenimiento/actions";
+import { SimulatedFileInput } from "@/components/shared/simulated-file-input";
 import { FilterBar } from "@/components/shared/filter-bar";
 import { StatusBadge, estadoVariant } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -69,6 +70,7 @@ export function MantenimientoModule({
       prioridad: fd.get("prioridad") as Mantenimiento["prioridad"],
       estado: "ABIERTO" as EstadoMantenimiento,
       solicitadoPorId: usuarioId,
+      adjuntoUrl: (fd.get("adjuntoUrl") as string) || undefined,
     };
     startTransition(async () => {
       const created = await crearMantenimientoAction(payload);
@@ -171,6 +173,9 @@ export function MantenimientoModule({
               <option value="MEDIA">MEDIA</option>
               <option value="ALTA">ALTA</option>
             </Select>
+          </FormField>
+          <FormField label="Evidencia adjunta">
+            <SimulatedFileInput name="adjuntoUrl" label="Foto o documento (simulado)" />
           </FormField>
         </form>
       </Modal>

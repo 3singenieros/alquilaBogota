@@ -2,9 +2,13 @@
 
 import {
   actualizarContratoAction,
+  aplicarReajusteCanonAction,
   crearContratoAction,
   eliminarContratoAction,
+  listarInmueblesParaContratoFormAction,
 } from "@/app/(dashboard)/contratos/actions";
+import { FormSection } from "@/components/shared/form-section";
+import { SimulatedFileInput } from "@/components/shared/simulated-file-input";
 import { FilterBar } from "@/components/shared/filter-bar";
 import { StatusBadge, estadoVariant } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -13,35 +17,67 @@ import { Input } from "@/components/ui/input";
 import { PageHeader } from "@/components/ui/page-header";
 import { Select } from "@/components/ui/select";
 import { Table, Td, Th, Tr } from "@/components/ui/table";
-import { inmuebleOptionLabel, inmueblesById, inmuebleDisplayFromId } from "@/lib/entity-labels";
+import { parseContratoFormData } from "@/lib/contrato-form";
+import {
+  inmuebleOptionLabel,
+  inmueblesById,
+  inmuebleDisplayFromId,
+  usuarioDisplayFromId,
+  usuariosById,
+} from "@/lib/entity-labels";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { getModulePermissions } from "@/lib/auth/permissions";
-import type { Contrato, EstadoContrato, Inmueble, Rol } from "@/types";
-import { listarInmueblesFormAction } from "@/app/(dashboard)/inmuebles/actions";
-import { Pencil, Plus, Trash2 } from "lucide-react";
+import type {
+  Contrato,
+  EstadoContrato,
+  EstadoDepositoGarantia,
+  Inmueble,
+  Rol,
+  Usuario,
+} from "@/types";
+import { Percent, Pencil, Plus, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState, useTransition } from "react";
 
-const ESTADOS: EstadoContrato[] = ["ACTIVO", "VENCIDO", "PENDIENTE", "TERMINADO"];
+const ESTADOS: EstadoContrato[] = [
+  "BORRADOR",
+  "PENDIENTE_CONFIRMACION",
+  "CONFIRMADO",
+  "RECHAZADO",
+  "CANCELADO",
+  "TERMINADO",
+  "VENCIDO",
+];
+const DEPOSITO_ESTADOS: EstadoDepositoGarantia[] = ["PENDIENTE", "DEVUELTO", "APLICADO"];
 
 export function ContratosModule({
   initialData,
   inmuebles,
+  arrendatarios = [],
   rol,
   usuarioId,
 }: {
   initialData: Contrato[];
   inmuebles: Inmueble[];
+  arrendatarios?: Usuario[];
   rol: Rol;
   usuarioId: string;
 }) {
   const perms = getModulePermissions(rol, "contratos");
   const [inmueblesOptions, setInmueblesOptions] = useState(inmuebles);
   const inmueblesMap = useMemo(() => inmueblesById(inmueblesOptions), [inmueblesOptions]);
+  const usuariosMap = useMemo(
+    () => usuariosById(arrendatarios),
+    [arrendatarios]
+  );
   const [items, setItems] = useState(initialData);
   const [search, setSearch] = useState("");
   const [estadoFilter, setEstadoFilter] = useState("");
   const [open, setOpen] = useState(false);
+  const [openReajuste, setOpenReajuste] = useState(false);
+  const [reajusteTarget, setReajusteTarget] = useState<Contrato | null>(null);
+  const [porcentajeReajuste, setPorcentajeReajuste] = useState("5");
   const [editing, setEditing] = useState<Contrato | null>(null);
+  const [formError, setFormError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
   useEffect(() => {
@@ -49,8 +85,9 @@ export function ContratosModule({
   }, [inmuebles]);
 
   async function openForm(editingItem: Contrato | null) {
-    const fresh = await listarInmueblesFormAction();
+    const fresh = await listarInmueblesParaContratoFormAction(editingItem?.id);
     setInmueblesOptions(fresh);
+    setFormError(null);
     setEditing(editingItem);
     setOpen(true);
   }
@@ -59,7 +96,10 @@ export function ContratosModule({
     () =>
       items.filter((c) => {
         const q = search.toLowerCase();
-        const matchSearch = !search || c.id.toLowerCase().includes(q) || c.inmuebleId.includes(q);
+        const matchSearch =
+          !search ||
+          c.code.toLowerCase().includes(q) ||
+          c.inmuebleId.toLowerCase().includes(q);
         const matchEstado = !estadoFilter || c.estado === estadoFilter;
         return matchSearch && matchEstado;
       }),
@@ -70,27 +110,55 @@ export function ContratosModule({
     e.preventDefault();
     const fd = new FormData(e.currentTarget);
     const payload = {
-      inmuebleId: fd.get("inmuebleId") as string,
-      arrendatarioId: (fd.get("arrendatarioId") as string) || "u-arrendatario",
+      ...parseContratoFormData(fd),
       arrendadorId: usuarioId,
-      fechaInicio: fd.get("fechaInicio") as string,
-      fechaFin: fd.get("fechaFin") as string,
-      canonMensual: Number(fd.get("canonMensual")),
-      estado: fd.get("estado") as EstadoContrato,
-      documentoUrl: (fd.get("documentoUrl") as string) || undefined,
     };
     startTransition(async () => {
+      setFormError(null);
       if (editing) {
-        const updated = await actualizarContratoAction(editing.id, payload);
-        if (updated) {
-          setItems((prev) => prev.map((i) => (i.id === editing.id ? { ...i, ...updated } : i)));
+        const result = await actualizarContratoAction(editing.id, payload);
+        if (!result.ok) {
+          setFormError(result.error);
+          return;
+        }
+        if (result.data) {
+          setItems((prev) =>
+            prev.map((i) => (i.id === editing.id ? { ...i, ...result.data! } : i))
+          );
         }
       } else {
-        const created = await crearContratoAction(payload);
-        if (created) setItems((prev) => [...prev, created]);
+        if (inmueblesOptions.length === 0) {
+          setFormError("No hay inmuebles disponibles sin contrato activo.");
+          return;
+        }
+        const result = await crearContratoAction(payload);
+        if (!result.ok) {
+          setFormError(result.error);
+          return;
+        }
+        if (result.data) setItems((prev) => [...prev, result.data!]);
       }
       setOpen(false);
       setEditing(null);
+    });
+  }
+
+  function handleReajuste() {
+    if (!reajusteTarget) return;
+    const pct = Number(porcentajeReajuste);
+    startTransition(async () => {
+      const result = await aplicarReajusteCanonAction(reajusteTarget.id, pct);
+      if (!result.ok) {
+        setFormError(result.error);
+        return;
+      }
+      if (result.data) {
+        setItems((prev) =>
+          prev.map((c) => (c.id === reajusteTarget.id ? { ...c, ...result.data! } : c))
+        );
+      }
+      setOpenReajuste(false);
+      setReajusteTarget(null);
     });
   }
 
@@ -98,7 +166,7 @@ export function ContratosModule({
     <>
       <PageHeader
         title="Contratos"
-        description="Contratos de arrendamiento — documentos adjuntos, sin firma digital real"
+        description="Trazabilidad contractual — codeudor, depósito, preaviso y reajuste de canon"
         action={
           perms.canCreate ? (
             <Button onClick={() => openForm(null)}>
@@ -113,59 +181,95 @@ export function ContratosModule({
         estado={estadoFilter}
         onEstadoChange={setEstadoFilter}
         estados={ESTADOS.map((e) => ({ value: e, label: e }))}
+        placeholder="Código o inmueble..."
       />
-      <Table>
-        <thead>
-          <tr>
-            <Th>Código</Th>
-            <Th>Inmueble</Th>
-            <Th>Vigencia</Th>
-            <Th>Canon</Th>
-            <Th>Estado</Th>
-            {(perms.canEdit || perms.canDelete) && <Th className="text-right">Acciones</Th>}
-          </tr>
-        </thead>
-        <tbody>
-          {filtered.map((c) => (
-            <Tr key={c.id}>
-              <Td className="font-mono text-xs text-slate-600">{c.code}</Td>
-              <Td>{inmuebleDisplayFromId(c.inmuebleId, inmueblesMap)}</Td>
-              <Td>
-                {formatDate(c.fechaInicio)} — {formatDate(c.fechaFin)}
-              </Td>
-              <Td>{formatCurrency(c.canonMensual)}</Td>
-              <Td>
-                <StatusBadge label={c.estado} variant={estadoVariant(c.estado)} />
-              </Td>
-              {(perms.canEdit || perms.canDelete) && (
-                <Td className="text-right">
-                  {perms.canEdit && (
-                    <Button variant="ghost" size="sm" onClick={() => openForm(c)}>
-                      <Pencil className="h-4 w-4" />
-                    </Button>
-                  )}
-                  {perms.canDelete && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => {
-                        if (confirm("¿Eliminar?")) {
-                          startTransition(async () => {
-                            await eliminarContratoAction(c.id);
-                            setItems((p) => p.filter((x) => x.id !== c.id));
-                          });
-                        }
-                      }}
-                    >
-                      <Trash2 className="h-4 w-4 text-red-500" />
-                    </Button>
-                  )}
+      <div className="overflow-x-auto">
+        <Table>
+          <thead>
+            <tr>
+              <Th>Código</Th>
+              <Th>Inmueble</Th>
+              <Th>Arrendatario</Th>
+              <Th>Canon actual</Th>
+              <Th>Inicio</Th>
+              <Th>Fin</Th>
+              <Th>Estado</Th>
+              <Th>Prórroga</Th>
+              <Th>Preaviso</Th>
+              <Th>Codeudor</Th>
+              <Th>Depósito</Th>
+              {(perms.canEdit || perms.canDelete) && <Th className="text-right">Acciones</Th>}
+            </tr>
+          </thead>
+          <tbody>
+            {filtered.map((c) => (
+              <Tr key={c.id}>
+                <Td className="font-mono text-xs text-slate-600">{c.code}</Td>
+                <Td>{inmuebleDisplayFromId(c.inmuebleId, inmueblesMap)}</Td>
+                <Td className="max-w-[140px] text-xs">
+                  {usuarioDisplayFromId(c.arrendatarioId, usuariosMap)}
                 </Td>
-              )}
-            </Tr>
-          ))}
-        </tbody>
-      </Table>
+                <Td>{formatCurrency(c.canonActual)}</Td>
+                <Td>{formatDate(c.fechaInicio)}</Td>
+                <Td>{formatDate(c.fechaFin)}</Td>
+                <Td>
+                  <StatusBadge label={c.estado} variant={estadoVariant(c.estado)} />
+                </Td>
+                <Td>{c.prorrogaAutomatica ? "Sí" : "No"}</Td>
+                <Td>{formatDate(c.fechaLimitePreaviso)}</Td>
+                <Td className="text-xs">{c.codeudorNombre ?? "—"}</Td>
+                <Td>
+                  <StatusBadge
+                    label={c.depositoGarantiaEstado}
+                    variant={estadoVariant(c.depositoGarantiaEstado)}
+                  />
+                </Td>
+                {(perms.canEdit || perms.canDelete) && (
+                  <Td className="text-right whitespace-nowrap">
+                    {perms.canEdit && (
+                      <>
+                        <Button variant="ghost" size="sm" onClick={() => openForm(c)}>
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          title="Aplicar reajuste"
+                          disabled={c.estado !== "CONFIRMADO"}
+                          onClick={() => {
+                            setReajusteTarget(c);
+                            setPorcentajeReajuste("5");
+                            setOpenReajuste(true);
+                          }}
+                        >
+                          <Percent className="h-4 w-4" />
+                        </Button>
+                      </>
+                    )}
+                    {perms.canDelete && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          if (confirm("¿Eliminar?")) {
+                            startTransition(async () => {
+                              await eliminarContratoAction(c.id);
+                              setItems((p) => p.filter((x) => x.id !== c.id));
+                            });
+                          }
+                        }}
+                      >
+                        <Trash2 className="h-4 w-4 text-red-500" />
+                      </Button>
+                    )}
+                  </Td>
+                )}
+              </Tr>
+            ))}
+          </tbody>
+        </Table>
+      </div>
+
       <Modal
         open={open}
         onClose={() => { setOpen(false); setEditing(null); }}
@@ -173,7 +277,13 @@ export function ContratosModule({
         footer={
           <>
             <Button variant="secondary" onClick={() => setOpen(false)}>Cancelar</Button>
-            <Button type="submit" form="ctr-form" disabled={pending}>Guardar</Button>
+            <Button
+              type="submit"
+              form="ctr-form"
+              disabled={pending || (!editing && inmueblesOptions.length === 0)}
+            >
+              Guardar
+            </Button>
           </>
         }
       >
@@ -181,45 +291,221 @@ export function ContratosModule({
           id="ctr-form"
           key={editing?.id ?? `new-${inmueblesOptions.map((i) => i.id).join(",")}`}
           onSubmit={handleSubmit}
-          className="space-y-4"
+          className="space-y-2"
         >
-          <FormField label="Inmueble">
-            <Select
-              name="inmuebleId"
-              defaultValue={editing?.inmuebleId ?? inmueblesOptions[0]?.id}
-              required
-            >
-              {inmueblesOptions.map((inm) => (
-                <option key={inm.id} value={inm.id}>
-                  {inmuebleOptionLabel(inm)}
-                </option>
-              ))}
-            </Select>
-          </FormField>
-          <div className="grid grid-cols-2 gap-3">
-            <FormField label="Inicio">
-              <Input name="fechaInicio" type="date" defaultValue={editing?.fechaInicio} required />
-            </FormField>
-            <FormField label="Fin">
-              <Input name="fechaFin" type="date" defaultValue={editing?.fechaFin} required />
-            </FormField>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <FormField label="Canon">
-              <Input name="canonMensual" type="number" defaultValue={editing?.canonMensual} required />
-            </FormField>
-            <FormField label="Estado">
-              <Select name="estado" defaultValue={editing?.estado ?? "ACTIVO"}>
-                {ESTADOS.map((e) => (
-                  <option key={e} value={e}>{e}</option>
-                ))}
-              </Select>
-            </FormField>
-          </div>
-          <FormField label="URL documento (demo)">
-            <Input name="documentoUrl" defaultValue={editing?.documentoUrl} placeholder="/docs/contrato.pdf" />
-          </FormField>
+          {formError && (
+            <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+              {formError}
+            </p>
+          )}
+          {!editing && inmueblesOptions.length === 0 ? (
+            <p className="text-sm text-slate-600">
+              Todos los inmuebles tienen un contrato activo.
+            </p>
+          ) : (
+            <>
+              <FormSection title="Datos generales">
+                <FormField label="Inmueble">
+                  <Select
+                    name="inmuebleId"
+                    defaultValue={editing?.inmuebleId ?? inmueblesOptions[0]?.id}
+                    required
+                  >
+                    {inmueblesOptions.map((inm) => (
+                      <option key={inm.id} value={inm.id}>
+                        {inmuebleOptionLabel(inm)}
+                      </option>
+                    ))}
+                  </Select>
+                </FormField>
+                <div className="grid grid-cols-2 gap-3">
+                  <FormField label="Inicio">
+                    <Input name="fechaInicio" type="date" defaultValue={editing?.fechaInicio} required />
+                  </FormField>
+                  <FormField label="Fin">
+                    <Input name="fechaFin" type="date" defaultValue={editing?.fechaFin} required />
+                  </FormField>
+                </div>
+                {editing ? (
+                  <FormField label="Estado">
+                    <Select name="estado" defaultValue={editing.estado}>
+                      {ESTADOS.map((e) => (
+                        <option key={e} value={e}>{e}</option>
+                      ))}
+                    </Select>
+                  </FormField>
+                ) : (
+                  <input type="hidden" name="estado" value="PENDIENTE_CONFIRMACION" />
+                )}
+              </FormSection>
+
+              <FormSection title="Partes del contrato">
+                {!editing ? (
+                  <>
+                    <FormField label="Email del arrendatario">
+                      <Input
+                        name="emailArrendatario"
+                        type="email"
+                        placeholder="arrendatario@demo.edu"
+                        required
+                      />
+                    </FormField>
+                    <FormField label="Nombre del arrendatario">
+                      <Input name="nombreArrendatario" placeholder="Nombre completo" />
+                    </FormField>
+                    <p className="text-xs text-slate-500">
+                      Se enviará una invitación. El contrato quedará en{" "}
+                      <strong>PENDIENTE_CONFIRMACION</strong> hasta que acepte.
+                    </p>
+                  </>
+                ) : (
+                  <FormField label="Arrendatario">
+                    <Input
+                      readOnly
+                      defaultValue={
+                        editing.nombreArrendatario
+                          ? `${editing.nombreArrendatario} (${editing.emailArrendatario})`
+                          : editing.emailArrendatario
+                      }
+                    />
+                    <input type="hidden" name="emailArrendatario" value={editing.emailArrendatario} />
+                    <input type="hidden" name="nombreArrendatario" value={editing.nombreArrendatario ?? ""} />
+                    <input type="hidden" name="arrendatarioId" value={editing.arrendatarioId} />
+                  </FormField>
+                )}
+                <input type="hidden" name="arrendadorId" value={usuarioId} />
+              </FormSection>
+
+              <FormSection title="Información económica">
+                <div className="grid grid-cols-2 gap-3">
+                  <FormField label="Canon actual">
+                    <Input
+                      name="canonActual"
+                      type="number"
+                      defaultValue={editing?.canonActual}
+                      required
+                    />
+                  </FormField>
+                  <FormField label="Canon anterior">
+                    <Input
+                      name="canonAnterior"
+                      type="number"
+                      defaultValue={editing?.canonAnterior ?? 0}
+                    />
+                  </FormField>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <FormField label="Depósito / garantía">
+                    <Input
+                      name="depositoGarantiaValor"
+                      type="number"
+                      defaultValue={editing?.depositoGarantiaValor ?? 0}
+                    />
+                  </FormField>
+                  <FormField label="Estado depósito">
+                    <Select
+                      name="depositoGarantiaEstado"
+                      defaultValue={editing?.depositoGarantiaEstado ?? "PENDIENTE"}
+                    >
+                      {DEPOSITO_ESTADOS.map((e) => (
+                        <option key={e} value={e}>{e}</option>
+                      ))}
+                    </Select>
+                  </FormField>
+                </div>
+              </FormSection>
+
+              <FormSection title="Prórroga y preaviso">
+                <label className="flex items-center gap-2 text-sm text-slate-700">
+                  <input
+                    type="checkbox"
+                    name="prorrogaAutomatica"
+                    defaultChecked={editing?.prorrogaAutomatica}
+                    className="rounded border-slate-300"
+                  />
+                  Prórroga automática
+                </label>
+                <FormField label="Fecha límite de preaviso">
+                  <Input
+                    name="fechaLimitePreaviso"
+                    type="date"
+                    defaultValue={editing?.fechaLimitePreaviso ?? editing?.fechaFin}
+                    required
+                  />
+                </FormField>
+              </FormSection>
+
+              <FormSection title="Codeudor / fiador">
+                <FormField label="Nombre">
+                  <Input name="codeudorNombre" defaultValue={editing?.codeudorNombre} />
+                </FormField>
+                <div className="grid grid-cols-2 gap-3">
+                  <FormField label="Documento">
+                    <Input name="codeudorDocumento" defaultValue={editing?.codeudorDocumento} />
+                  </FormField>
+                  <FormField label="Teléfono">
+                    <Input name="codeudorTelefono" defaultValue={editing?.codeudorTelefono} />
+                  </FormField>
+                </div>
+                <FormField label="Email codeudor">
+                  <Input name="codeudorEmail" type="email" defaultValue={editing?.codeudorEmail} />
+                </FormField>
+              </FormSection>
+
+              <FormSection title="Inventario y documentos">
+                <FormField label="Inventario de entrega">
+                  <Input name="inventarioEntrega" defaultValue={editing?.inventarioEntrega} />
+                </FormField>
+                <FormField label="Observaciones de entrega">
+                  <Input name="observacionesEntrega" defaultValue={editing?.observacionesEntrega} />
+                </FormField>
+                <FormField label="Documento del contrato">
+                  <SimulatedFileInput
+                    name="documentoUrl"
+                    defaultValue={editing?.documentoUrl}
+                    label="Adjuntar contrato (simulado)"
+                  />
+                </FormField>
+              </FormSection>
+            </>
+          )}
         </form>
+      </Modal>
+
+      <Modal
+        open={openReajuste}
+        onClose={() => { setOpenReajuste(false); setReajusteTarget(null); }}
+        title="Aplicar reajuste de canon"
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setOpenReajuste(false)}>Cancelar</Button>
+            <Button onClick={handleReajuste} disabled={pending}>
+              Aplicar
+            </Button>
+          </>
+        }
+      >
+        {reajusteTarget && (
+          <div className="space-y-4">
+            <p className="text-sm text-slate-600">
+              Contrato <strong>{reajusteTarget.code}</strong> — canon actual{" "}
+              {formatCurrency(reajusteTarget.canonActual)}
+            </p>
+            <FormField label="Porcentaje de reajuste (%)">
+              <Input
+                type="number"
+                min={0.01}
+                max={100}
+                step={0.01}
+                value={porcentajeReajuste}
+                onChange={(e) => setPorcentajeReajuste(e.target.value)}
+              />
+            </FormField>
+            <p className="text-xs text-slate-500">
+              Se registrarán notificaciones simuladas para arrendador y arrendatario.
+            </p>
+          </div>
+        )}
       </Modal>
     </>
   );

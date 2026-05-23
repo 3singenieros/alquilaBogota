@@ -1,9 +1,8 @@
 "use client";
 
-import { logoutAction } from "@/app/login/actions";
-import { Button } from "@/components/ui/button";
+import { LogoutButton } from "@/components/layout/logout-button";
 import type { Usuario } from "@/types";
-import { LogOut, Menu, Search } from "lucide-react";
+import { Menu, Search } from "lucide-react";
 
 export function Topbar({
   onMenuClick,
@@ -33,20 +32,28 @@ export function Topbar({
       </div>
       <div className="ml-auto flex items-center gap-3">
         <div className="flex items-center gap-2 rounded-lg bg-slate-50 px-3 py-2">
-          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-indigo-100 text-sm font-semibold text-indigo-700">
-            {usuario.nombre.charAt(0)}
-          </div>
+          {usuario.photoURL ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={usuario.photoURL}
+              alt=""
+              className="h-8 w-8 rounded-full object-cover"
+              referrerPolicy="no-referrer"
+            />
+          ) : (
+            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-indigo-100 text-sm font-semibold text-indigo-700">
+              {usuario.nombre.charAt(0)}
+            </div>
+          )}
           <div className="hidden text-left sm:block">
             <p className="text-sm font-medium text-slate-900">{usuario.nombre}</p>
-            <p className="text-xs text-slate-500">{usuario.rol}</p>
+            <p className="text-xs text-slate-500">{usuario.email}</p>
+            <p className="text-[10px] font-medium uppercase tracking-wide text-indigo-600">
+              {usuario.rol}
+            </p>
           </div>
         </div>
-        <form action={logoutAction}>
-          <Button type="submit" variant="secondary" size="sm" title="Cerrar sesión">
-            <LogOut className="h-4 w-4" />
-            <span className="hidden sm:inline">Salir</span>
-          </Button>
-        </form>
+        <LogoutButton />
       </div>
     </header>
   );

@@ -1,9 +1,12 @@
-import { MOCK_CREDENTIALS } from "@/lib/auth/mock-credentials";
 import { AuthError } from "@/lib/auth/errors";
 import {
   canAccessModule,
   type AppModule,
 } from "@/lib/auth/permissions";
+import {
+  resolveRolFromEmail,
+  resolveUsuarioIdFromEmail,
+} from "@/lib/auth/role-resolver";
 import {
   createSessionToken,
   SESSION_COOKIE_NAME,
@@ -14,22 +17,71 @@ import type { AuthSession } from "@/types/auth";
 import type { Rol, Usuario } from "@/types";
 import { cookies } from "next/headers";
 
-export async function login(
-  username: string,
-  password: string
-): Promise<{ ok: true; usuario: Usuario } | { ok: false }> {
-  const key = username.trim().toLowerCase();
-  const cred = MOCK_CREDENTIALS[key];
-  if (!cred || cred.password !== password) {
-    return { ok: false };
+export type FirebaseSessionInput = {
+  email: string;
+  displayName: string;
+  firebaseUid: string;
+  photoURL?: string;
+};
+
+async function buildUsuarioFromPayload(
+  payload: Awaited<ReturnType<typeof verifySessionToken>> & object
+): Promise<Usuario | null> {
+  if (!payload) return null;
+  const repo = getUsuariosRepository();
+  const seed = await repo.findById(payload.userId);
+  if (seed && seed.activo && seed.rol === payload.rol) {
+    return {
+      ...seed,
+      nombre: payload.displayName || seed.nombre,
+      email: payload.email,
+      photoURL: payload.photoURL ?? seed.photoURL,
+    };
   }
 
-  const usuario = await getUsuariosRepository().findById(cred.userId);
-  if (!usuario || !usuario.activo || usuario.rol !== cred.rol) {
-    return { ok: false };
+  const byEmail = (await repo.findAll()).find(
+    (u) => u.email.toLowerCase() === payload.email.toLowerCase()
+  );
+  if (byEmail && byEmail.activo) {
+    return {
+      ...byEmail,
+      nombre: payload.displayName || byEmail.nombre,
+      email: payload.email,
+      photoURL: payload.photoURL ?? byEmail.photoURL,
+    };
   }
 
-  const token = await createSessionToken(usuario.id, usuario.rol);
+  return {
+    id: payload.userId,
+    code: payload.firebaseUid.slice(0, 12),
+    nombre: payload.displayName || payload.email.split("@")[0],
+    email: payload.email,
+    rol: payload.rol,
+    activo: true,
+    creadoEn: new Date().toISOString().slice(0, 10),
+    photoURL: payload.photoURL,
+  };
+}
+
+export async function syncFirebaseSession(
+  input: FirebaseSessionInput
+): Promise<{ ok: true; usuario: Usuario }> {
+  const email = input.email.trim().toLowerCase();
+  if (!email) {
+    throw new AuthError("Email de Firebase inválido", "UNAUTHORIZED");
+  }
+
+  const rol = await resolveRolFromEmail(email);
+  const userId = await resolveUsuarioIdFromEmail(email, input.firebaseUid);
+  const token = await createSessionToken({
+    userId,
+    rol,
+    email,
+    displayName: input.displayName || email.split("@")[0],
+    firebaseUid: input.firebaseUid,
+    photoURL: input.photoURL,
+  });
+
   const jar = await cookies();
   jar.set(SESSION_COOKIE_NAME, token, {
     httpOnly: true,
@@ -38,6 +90,13 @@ export async function login(
     path: "/",
     maxAge: 60 * 60 * 24 * 7,
   });
+
+  const usuario = await buildUsuarioFromPayload(
+    (await verifySessionToken(token))!
+  );
+  if (!usuario) {
+    throw new AuthError("No se pudo crear la sesión", "UNAUTHORIZED");
+  }
 
   return { ok: true, usuario };
 }
@@ -53,10 +112,8 @@ export async function getSession(): Promise<AuthSession | null> {
   const payload = await verifySessionToken(token);
   if (!payload) return null;
 
-  const usuario = await getUsuariosRepository().findById(payload.userId);
-  if (!usuario || !usuario.activo || usuario.rol !== payload.rol) {
-    return null;
-  }
+  const usuario = await buildUsuarioFromPayload(payload);
+  if (!usuario || !usuario.activo) return null;
 
   return { usuario };
 }

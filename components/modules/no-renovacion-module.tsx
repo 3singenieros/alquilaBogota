@@ -2,7 +2,11 @@
 
 import { listarContratosFormAction } from "@/app/(dashboard)/contratos/actions";
 import { listarInmueblesFormAction } from "@/app/(dashboard)/inmuebles/actions";
-import { crearNoRenovacionAction } from "@/app/(dashboard)/no-renovacion/actions";
+import {
+  crearNoRenovacionAction,
+  simularEnvioNotificacionNoRenovacionAction,
+} from "@/app/(dashboard)/no-renovacion/actions";
+import { SimulatedFileInput } from "@/components/shared/simulated-file-input";
 import { FilterBar } from "@/components/shared/filter-bar";
 import { StatusBadge, estadoVariant } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -15,7 +19,7 @@ import { contratoOptionLabel, inmueblesById } from "@/lib/entity-labels";
 import { getModulePermissions } from "@/lib/auth/permissions";
 import { formatDate } from "@/lib/utils";
 import type { Contrato, Inmueble, NoRenovacion, Rol } from "@/types";
-import { Plus } from "lucide-react";
+import { Mail, Plus } from "lucide-react";
 import { useEffect, useMemo, useState, useTransition } from "react";
 
 export function NoRenovacionModule({
@@ -69,12 +73,23 @@ export function NoRenovacionModule({
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const fd = new FormData(e.currentTarget);
+    const contratoId = fd.get("contratoId") as string;
+    const contrato = contratosOptions.find((c) => c.id === contratoId);
     const payload = {
-      contratoId: fd.get("contratoId") as string,
+      contratoId,
       motivo: fd.get("motivo") as string,
       fechaSolicitud: new Date().toISOString().slice(0, 10),
       estado: "SOLICITADA" as const,
       solicitadoPorId: usuarioId,
+      documentoUrl: (fd.get("documentoUrl") as string) || undefined,
+      fechaLimitePreaviso:
+        (fd.get("fechaLimitePreaviso") as string) || contrato?.fechaLimitePreaviso || "",
+      destinatarioArrendadorEmail:
+        (fd.get("destinatarioArrendadorEmail") as string) || "arrendador@demo.edu",
+      destinatarioArrendatarioEmail:
+        (fd.get("destinatarioArrendatarioEmail") as string) || "arrendatario@demo.edu",
+      estadoNotificacion: "PENDIENTE" as const,
+      observacionesNotificacion: (fd.get("observacionesNotificacion") as string) || undefined,
     };
     startTransition(async () => {
       const created = await crearNoRenovacionAction(payload);
@@ -83,11 +98,20 @@ export function NoRenovacionModule({
     });
   }
 
+  function simularEnvio(id: string) {
+    startTransition(async () => {
+      const updated = await simularEnvioNotificacionNoRenovacionAction(id);
+      if (updated) {
+        setItems((prev) => prev.map((n) => (n.id === id ? { ...n, ...updated } : n)));
+      }
+    });
+  }
+
   return (
     <>
       <PageHeader
         title="No renovación"
-        description="Solicitudes de terminación sin renovación del contrato"
+        description="Vinculado a vencimiento del contrato, preaviso y notificación simulada"
         action={
           perms.canCreate ? (
             <Button onClick={() => openForm()}>
@@ -108,37 +132,66 @@ export function NoRenovacionModule({
           { value: "RECHAZADA", label: "RECHAZADA" },
         ]}
       />
-      <Table>
-        <thead>
-          <tr>
-            <Th>Código</Th>
-            <Th>Contrato</Th>
-            <Th>Motivo</Th>
-            <Th>Fecha</Th>
-            <Th>Estado</Th>
-          </tr>
-        </thead>
-        <tbody>
-          {filtered.map((n) => {
-            const contrato = contratosOptions.find((c) => c.id === n.contratoId);
-            return (
-            <Tr key={n.id}>
-              <Td className="font-mono text-xs text-slate-600">{n.code}</Td>
-              <Td>
-                {contrato
-                  ? contratoOptionLabel(contrato, inmueblesMap)
-                  : n.contratoId}
-              </Td>
-              <Td>{n.motivo}</Td>
-              <Td>{formatDate(n.fechaSolicitud)}</Td>
-              <Td>
-                <StatusBadge label={n.estado} variant={estadoVariant(n.estado)} />
-              </Td>
-            </Tr>
-          );
-          })}
-        </tbody>
-      </Table>
+      <div className="overflow-x-auto">
+        <Table>
+          <thead>
+            <tr>
+              <Th>Código</Th>
+              <Th>Contrato</Th>
+              <Th>Motivo</Th>
+              <Th>Preaviso límite</Th>
+              <Th>Estado solicitud</Th>
+              <Th>Notificación</Th>
+              <Th>Envío simulado</Th>
+              <Th className="text-right">Acción</Th>
+            </tr>
+          </thead>
+          <tbody>
+            {filtered.map((n) => {
+              const contrato = contratosOptions.find((c) => c.id === n.contratoId);
+              return (
+                <Tr key={n.id}>
+                  <Td className="font-mono text-xs text-slate-600">{n.code}</Td>
+                  <Td>
+                    {contrato
+                      ? contratoOptionLabel(contrato, inmueblesMap)
+                      : n.contratoId}
+                  </Td>
+                  <Td>{n.motivo}</Td>
+                  <Td>{formatDate(n.fechaLimitePreaviso)}</Td>
+                  <Td>
+                    <StatusBadge label={n.estado} variant={estadoVariant(n.estado)} />
+                  </Td>
+                  <Td>
+                    <StatusBadge
+                      label={n.estadoNotificacion}
+                      variant={estadoVariant(n.estadoNotificacion)}
+                    />
+                  </Td>
+                  <Td className="text-xs">
+                    {n.fechaEnvioNotificacion
+                      ? formatDate(n.fechaEnvioNotificacion.slice(0, 10))
+                      : "—"}
+                  </Td>
+                  <Td className="text-right">
+                    {n.estadoNotificacion === "PENDIENTE" &&
+                      rol !== "ARRENDATARIO" && (
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          disabled={pending}
+                          onClick={() => simularEnvio(n.id)}
+                        >
+                          <Mail className="h-3.5 w-3.5" /> Simular envío
+                        </Button>
+                      )}
+                  </Td>
+                </Tr>
+              );
+            })}
+          </tbody>
+        </Table>
+      </div>
       <Modal
         open={open}
         onClose={() => setOpen(false)}
@@ -166,6 +219,35 @@ export function NoRenovacionModule({
           </FormField>
           <FormField label="Motivo">
             <Input name="motivo" required />
+          </FormField>
+          <FormField label="Fecha límite de preaviso">
+            <Input
+              name="fechaLimitePreaviso"
+              type="date"
+              defaultValue={contratosOptions[0]?.fechaLimitePreaviso}
+            />
+          </FormField>
+          <div className="grid grid-cols-2 gap-3">
+            <FormField label="Email arrendador">
+              <Input
+                name="destinatarioArrendadorEmail"
+                type="email"
+                defaultValue="arrendador@demo.edu"
+              />
+            </FormField>
+            <FormField label="Email arrendatario">
+              <Input
+                name="destinatarioArrendatarioEmail"
+                type="email"
+                defaultValue="arrendatario@demo.edu"
+              />
+            </FormField>
+          </div>
+          <FormField label="Documento / evidencia">
+            <SimulatedFileInput name="documentoUrl" label="Carta o soporte (simulado)" />
+          </FormField>
+          <FormField label="Observaciones notificación">
+            <Input name="observacionesNotificacion" placeholder="Opcional" />
           </FormField>
         </form>
       </Modal>

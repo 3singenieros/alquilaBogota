@@ -1,35 +1,56 @@
 ---
-description: Separación de capas de datos y UI
-globs: "{app,components,services,repositories,lib}/**/*.{ts,tsx}"
+description: Separación de capas, repositorios mock y notificaciones simuladas
+globs: "{app,components,services,repositories,lib,data}/**/*.{ts,tsx}"
 alwaysApply: false
 ---
 
-# Capas de datos
+# Capas de datos y negocio
 
-## Prohibido en componentes visuales
-- Consultas directas a Supabase
-- Arrays mock inline en páginas
-- Lógica de negocio compleja en JSX
+## Prohibido en componentes visuales (`components/**`, módulos cliente)
+- Consultas directas a Supabase.
+- Arrays mock inline en páginas o JSX.
+- Reglas de negocio (p. ej. un solo contrato activo, validación de preaviso, elegibilidad de notificación).
+- Llamadas a repositorios; solo Server Actions o props desde Server Components.
 
 ## Flujo correcto
 ```
-Page/Client → service → repository → (mock | Supabase)
+Page / Client Module → Server Action (delgada) → service → repository → (mock | Supabase preparado)
 ```
 
 ## Repositorios
-- Una interfaz por entidad.
-- Implementación `*MockRepository` y `*SupabaseRepository`.
-- Factory en `repositories/index.ts` según `USE_MOCK_DATA`.
+- Una interfaz por entidad (`Contrato`, `Notificacion`, etc.).
+- Implementación `*MockRepository` activa y `*SupabaseRepository` preparada sin conectar.
+- Factory en `repositories/index.ts` según configuración mock/Supabase.
+- Seed en `data/mock/seed.ts`; store en memoria compartido por proceso de dev.
 
 ## Servicios
-- Orquestan repositorios, validaciones ligeras y mapeo para UI.
+- Orquestan repositorios, **validaciones de dominio** y filtros por rol (`lib/auth/scopes`).
+- Reglas contractuales: canon en contrato, un `ACTIVO` por inmueble, coherencia no renovación ↔ fechas del contrato.
 - Exportar funciones usadas por Server Actions y Server Components.
+- Notificaciones: crear registro simulado, listar historial, enlazar `contratoId` / `pagoId` / etc.; sin SMTP real.
+
+## Server Actions (`app/**/actions.ts`)
+- Validar sesión delegando en services.
+- Revalidar rutas (`lib/revalidate-paths`) tras mutaciones que afecten formularios dependientes.
+- Devolver resultados tipados (`{ ok, data }` / `{ ok, error }`) cuando la UI deba mostrar errores de negocio.
+
+## Notificaciones (arquitectura)
+```
+components → actions → notifications.service → notifications.repository → mock
+                                    ↓
+                          (futuro) email.provider.ts → proveedor real
+```
+- El proveedor real queda detrás de una interfaz; el mock solo persiste historial y estado `SIMULADO` / `PREPARADA`.
 
 ## Ejemplo
 ```typescript
-// ❌ En page.tsx
-const data = mockInmuebles.filter(...)
+// ❌ En contratos-module.tsx
+const activos = contratos.filter((c) => c.estado === "ACTIVO" && c.inmuebleId === id);
 
-// ✅ En page.tsx
-const data = await inmueblesService.listar(filtros)
+// ✅ En contratos.service.ts
+export async function assertUnSoloContratoActivoPorInmueble(...) { ... }
 ```
+
+## Persistencia en esta fase
+- No activar cliente Supabase en flujos de demo salvo que el usuario pida explícitamente conectar.
+- Si se extiende `schema.sql`, reflejar campos contractuales y tablas de notificaciones sin obligar migración inmediata.

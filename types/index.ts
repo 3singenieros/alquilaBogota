@@ -1,11 +1,34 @@
 export type Rol = "ADMIN" | "ARRENDADOR" | "ARRENDATARIO";
 
-export type EstadoContrato = "ACTIVO" | "VENCIDO" | "PENDIENTE" | "TERMINADO";
+export type EstadoContrato =
+  | "BORRADOR"
+  | "PENDIENTE_CONFIRMACION"
+  | "CONFIRMADO"
+  | "RECHAZADO"
+  | "CANCELADO"
+  | "TERMINADO"
+  | "VENCIDO";
+
+export type EstadoInvitacionContrato = "PENDIENTE" | "ACEPTADA" | "RECHAZADA" | "EXPIRADA";
 export type EstadoInmueble = "DISPONIBLE" | "ARRENDADO" | "MANTENIMIENTO";
 export type EstadoPago = "REPORTADO" | "VALIDADO" | "RECHAZADO";
 export type EstadoServicio = "PENDIENTE" | "PAGADO" | "VENCIDO";
 export type EstadoMantenimiento = "ABIERTO" | "EN_PROGRESO" | "RESUELTO" | "CERRADO";
 export type EstadoNoRenovacion = "SOLICITADA" | "EN_REVISION" | "ACEPTADA" | "RECHAZADA";
+export type EstadoDepositoGarantia = "PENDIENTE" | "DEVUELTO" | "APLICADO";
+export type EstadoNotificacion = "PENDIENTE" | "SIMULADA" | "ERROR";
+export type EstadoNotificacionEnvio = "PENDIENTE" | "SIMULADA" | "ERROR";
+
+export type TipoNotificacion =
+  | "INVITACION_CONTRATO"
+  | "CONTRATO_ACEPTADO"
+  | "CONTRATO_RECHAZADO"
+  | "CONTRATO_PROXIMO_VENCER"
+  | "NO_RENOVACION"
+  | "PAGO_REPORTADO"
+  | "SERVICIO_VENCIDO"
+  | "MANTENIMIENTO"
+  | "REAJUSTE_CANON";
 
 export interface Usuario {
   id: string;
@@ -16,6 +39,7 @@ export interface Usuario {
   telefono?: string;
   activo: boolean;
   creadoEn: string;
+  photoURL?: string;
 }
 
 export interface Inmueble {
@@ -37,13 +61,41 @@ export interface Contrato {
   code: string;
   inmuebleId: string;
   arrendatarioId: string;
+  emailArrendatario: string;
+  nombreArrendatario?: string;
   arrendadorId: string;
   fechaInicio: string;
   fechaFin: string;
-  canonMensual: number;
+  canonActual: number;
+  canonAnterior: number;
+  porcentajeReajuste: number;
+  fechaUltimoReajuste?: string;
   estado: EstadoContrato;
   documentoUrl?: string;
+  codeudorNombre?: string;
+  codeudorDocumento?: string;
+  codeudorTelefono?: string;
+  codeudorEmail?: string;
+  depositoGarantiaValor: number;
+  depositoGarantiaEstado: EstadoDepositoGarantia;
+  prorrogaAutomatica: boolean;
+  fechaLimitePreaviso: string;
+  inventarioEntrega: string;
+  observacionesEntrega?: string;
+  motivoRechazo?: string;
   creadoEn: string;
+}
+
+export interface InvitacionContrato {
+  id: string;
+  contratoId: string;
+  emailInvitado: string;
+  nombreInvitado?: string;
+  estado: EstadoInvitacionContrato;
+  tokenInvitacion: string;
+  fechaCreacion: string;
+  fechaRespuesta?: string;
+  motivoRechazo?: string;
 }
 
 export interface PagoReportado {
@@ -64,6 +116,8 @@ export interface ServicioPublico {
   code: string;
   inmuebleId: string;
   tipo: string;
+  empresaPrestadora: string;
+  numeroCuentaServicio: string;
   periodo: string;
   monto: number;
   vencimiento: string;
@@ -94,6 +148,27 @@ export interface NoRenovacion {
   estado: EstadoNoRenovacion;
   documentoUrl?: string;
   solicitadoPorId: string;
+  fechaLimitePreaviso: string;
+  fechaEnvioNotificacion?: string;
+  destinatarioArrendadorEmail: string;
+  destinatarioArrendatarioEmail: string;
+  estadoNotificacion: EstadoNotificacionEnvio;
+  observacionesNotificacion?: string;
+}
+
+export interface Notificacion {
+  id: string;
+  tipo: TipoNotificacion;
+  contratoId?: string;
+  destinatarioNombre: string;
+  destinatarioEmail: string;
+  rolDestinatario: Rol;
+  asunto: string;
+  mensaje: string;
+  estado: EstadoNotificacion;
+  fechaCreacion: string;
+  fechaEnvioSimulado?: string;
+  referenciaModulo: string;
 }
 
 export interface ActividadReciente {

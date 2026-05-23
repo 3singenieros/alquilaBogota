@@ -1,4 +1,5 @@
 import { AppShell } from "@/components/layout/app-shell";
+import { FirebaseAuthProvider } from "@/components/providers/firebase-auth-provider";
 import { requireSession } from "@/services/auth.service";
 
 export default async function DashboardLayout({
@@ -8,5 +9,9 @@ export default async function DashboardLayout({
 }) {
   const session = await requireSession();
 
-  return <AppShell usuario={session.usuario}>{children}</AppShell>;
+  return (
+    <FirebaseAuthProvider>
+      <AppShell usuario={session.usuario}>{children}</AppShell>
+    </FirebaseAuthProvider>
+  );
 }

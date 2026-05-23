@@ -6,6 +6,10 @@ export type SessionTokenPayload = {
   userId: string;
   rol: Rol;
   exp: number;
+  email: string;
+  displayName: string;
+  firebaseUid: string;
+  photoURL?: string;
 };
 
 function getSecret(): string {
@@ -21,7 +25,15 @@ function decodePayload(encoded: string): SessionTokenPayload | null {
     const parsed = JSON.parse(
       Buffer.from(encoded, "base64url").toString("utf8")
     ) as SessionTokenPayload;
-    if (!parsed.userId || !parsed.rol || typeof parsed.exp !== "number") return null;
+    if (
+      !parsed.userId ||
+      !parsed.rol ||
+      typeof parsed.exp !== "number" ||
+      !parsed.email ||
+      !parsed.firebaseUid
+    ) {
+      return null;
+    }
     return parsed;
   } catch {
     return null;
@@ -43,13 +55,16 @@ function bufferToBase64Url(buffer: ArrayBuffer): string {
   return Buffer.from(buffer).toString("base64url");
 }
 
-export async function createSessionToken(
-  userId: string,
-  rol: Rol
-): Promise<string> {
+export async function createSessionToken(params: {
+  userId: string;
+  rol: Rol;
+  email: string;
+  displayName: string;
+  firebaseUid: string;
+  photoURL?: string;
+}): Promise<string> {
   const payload: SessionTokenPayload = {
-    userId,
-    rol,
+    ...params,
     exp: Date.now() + 7 * 24 * 60 * 60 * 1000,
   };
   const body = encodePayload(payload);

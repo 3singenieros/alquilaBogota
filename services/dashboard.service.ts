@@ -1,4 +1,5 @@
 import { seedActividad, seedIncidencias } from "@/data/mock/seed";
+import { contratoProximoAVencer, preavisoVencido } from "@/lib/contrato-alertas";
 import { loadAuthContext } from "@/lib/auth/load-context";
 import {
   filterContratos,
@@ -7,13 +8,20 @@ import {
   filterPagos,
 } from "@/lib/auth/scopes";
 import { assertModuleAccess, requireSession } from "@/services/auth.service";
-import { getMantenimientoRepository, getPagosRepository } from "@/repositories";
-import type { Rol } from "@/types";
+import {
+  getInvitacionesContratoRepository,
+  getMantenimientoRepository,
+  getNotificacionesRepository,
+  getPagosRepository,
+  getServiciosRepository,
+} from "@/repositories";
+import { filtroNotificacionesPorRol } from "@/services/notificaciones.service";
+import type { Contrato, Rol } from "@/types";
 
 const ACTIVIDAD_POR_ROL: Record<Rol, string[]> = {
-  ADMIN: ["Pagos", "Mantenimiento", "Contratos", "Servicios públicos", "No renovación"],
-  ARRENDADOR: ["Pagos", "Mantenimiento", "Contratos"],
-  ARRENDATARIO: ["Pagos", "Mantenimiento", "No renovación"],
+  ADMIN: ["Pagos", "Mantenimiento", "Contratos", "Servicios públicos", "No renovación", "Notificaciones"],
+  ARRENDADOR: ["Pagos", "Mantenimiento", "Contratos", "Notificaciones"],
+  ARRENDATARIO: ["Pagos", "Mantenimiento", "No renovación", "Notificaciones"],
 };
 
 export async function getDashboardResumen() {
@@ -23,28 +31,59 @@ export async function getDashboardResumen() {
   const { contratos, inmuebles } = await loadAuthContext();
   const inmueblesScope = filterInmuebles(inmuebles, usuario);
   const contratosScope = filterContratos(contratos, usuario);
-  const [pagosAll, mantenimientoAll] = await Promise.all([
-    getPagosRepository().findAll(),
-    getMantenimientoRepository().findAll(),
-  ]);
+  const [pagosAll, mantenimientoAll, serviciosAll, notificacionesAll] =
+    await Promise.all([
+      getPagosRepository().findAll(),
+      getMantenimientoRepository().findAll(),
+      getServiciosRepository().findAll(),
+      getNotificacionesRepository().findAll(),
+    ]);
   const pagos = filterPagos(pagosAll, usuario, contratos);
   const mantenimiento = filterMantenimiento(mantenimientoAll, usuario, inmuebles);
+  const servicios = serviciosAll.filter((s) =>
+    inmueblesScope.some((i) => i.id === s.inmuebleId)
+  );
+  const notificaciones = filtroNotificacionesPorRol(
+    notificacionesAll,
+    usuario.rol,
+    usuario.email
+  );
 
-  const contratosActivos = contratosScope.filter((c) => c.estado === "ACTIVO").length;
-  const pagosPendientes = pagos.filter((p) => p.estado === "REPORTADO").length;
-  const mantenimientoAbierto = mantenimiento.filter(
-    (m) => m.estado === "ABIERTO" || m.estado === "EN_PROGRESO"
+  const contratosActivosList = contratosScope.filter((c) => c.estado === "CONFIRMADO");
+  const contratosPendientesConfirmacion = contratosScope.filter(
+    (c) => c.estado === "PENDIENTE_CONFIRMACION"
+  );
+  const contratosRechazados = contratosScope.filter((c) => c.estado === "RECHAZADO");
+  const invitacionesAll = await getInvitacionesContratoRepository().findAll();
+  const solicitudesPendientes = invitacionesAll.filter(
+    (i) =>
+      i.estado === "PENDIENTE" &&
+      i.emailInvitado.toLowerCase() === usuario.email.toLowerCase()
   ).length;
+  const contratosProximosVencer = contratosActivosList.filter((c) =>
+    contratoProximoAVencer(c)
+  );
+  const preavisosVencidos = contratosActivosList.filter((c) => preavisoVencido(c));
 
   return {
     totalInmuebles: inmueblesScope.length,
     inmueblesArrendados: inmueblesScope.filter((i) => i.estado === "ARRENDADO").length,
-    contratosActivos,
-    pagosPendientes,
-    mantenimientoAbierto,
-    ingresosEstimados: contratosScope
-      .filter((c) => c.estado === "ACTIVO")
-      .reduce((sum, c) => sum + c.canonMensual, 0),
+    contratosActivos: contratosActivosList.length,
+    pagosPendientes: pagos.filter((p) => p.estado === "REPORTADO").length,
+    mantenimientoAbierto: mantenimiento.filter(
+      (m) => m.estado === "ABIERTO" || m.estado === "EN_PROGRESO"
+    ).length,
+    ingresosEstimados: contratosActivosList.reduce((sum, c) => sum + c.canonActual, 0),
+    serviciosVencidos: servicios.filter((s) => s.estado === "VENCIDO").length,
+    notificacionesPendientes: notificaciones.filter((n) => n.estado === "PENDIENTE").length,
+    contratosProximosVencer,
+    preavisosVencidos,
+    contratosProximosVencerCount: contratosProximosVencer.length,
+    preavisosVencidosCount: preavisosVencidos.length,
+    contratosPendientesConfirmacionCount: contratosPendientesConfirmacion.length,
+    contratosPendientesConfirmacion,
+    contratosRechazadosCount: contratosRechazados.length,
+    solicitudesPendientes,
   };
 }
 
@@ -58,4 +97,8 @@ export async function getIncidencias() {
   const { usuario } = await requireSession();
   const modulos = ACTIVIDAD_POR_ROL[usuario.rol];
   return seedIncidencias.filter((i) => modulos.includes(i.modulo));
+}
+
+export function resumenContratoAlerta(c: Contrato): string {
+  return `${c.code} — vence ${c.fechaFin}`;
 }

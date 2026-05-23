@@ -4,7 +4,9 @@ import {
   actualizarNoRenovacion,
   crearNoRenovacion,
   eliminarNoRenovacion,
+  simularEnvioNotificacionNoRenovacion,
 } from "@/services/no-renovacion.service";
+import { revalidateNotificacionDependents } from "@/lib/revalidate-paths";
 import type { CreateInput, NoRenovacion, UpdateInput } from "@/types";
 import { revalidatePath } from "next/cache";
 
@@ -26,4 +28,11 @@ export async function actualizarNoRenovacionAction(
 export async function eliminarNoRenovacionAction(id: string) {
   await eliminarNoRenovacion(id);
   revalidatePath("/no-renovacion");
+}
+
+export async function simularEnvioNotificacionNoRenovacionAction(id: string) {
+  const updated = await simularEnvioNotificacionNoRenovacion(id);
+  revalidatePath("/no-renovacion");
+  revalidateNotificacionDependents();
+  return updated;
 }

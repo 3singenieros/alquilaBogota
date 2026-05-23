@@ -1,4 +1,5 @@
 import { LoginForm } from "@/components/auth/login-form";
+import { redirectIfAuthenticated } from "@/app/login/actions";
 
 export default async function LoginPage({
   searchParams,
@@ -10,6 +11,8 @@ export default async function LoginPage({
     params.next?.startsWith("/") && !params.next.startsWith("//")
       ? params.next
       : undefined;
+
+  await redirectIfAuthenticated(nextPath);
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-[var(--background)] px-4">

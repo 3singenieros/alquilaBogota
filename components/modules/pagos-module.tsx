@@ -3,6 +3,7 @@
 import { listarContratosFormAction } from "@/app/(dashboard)/contratos/actions";
 import { listarInmueblesFormAction } from "@/app/(dashboard)/inmuebles/actions";
 import { crearPagoAction } from "@/app/(dashboard)/pagos/actions";
+import { SimulatedFileInput } from "@/components/shared/simulated-file-input";
 import { FilterBar } from "@/components/shared/filter-bar";
 import { StatusBadge, estadoVariant } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -171,8 +172,8 @@ export function PagosModule({
           <FormField label="Monto">
             <Input name="monto" type="number" required />
           </FormField>
-          <FormField label="URL comprobante (demo / Storage)">
-            <Input name="comprobanteUrl" placeholder="comprobantes/..." />
+          <FormField label="Comprobante">
+            <SimulatedFileInput name="comprobanteUrl" label="Comprobante (simulado)" />
           </FormField>
           <FormField label="Notas">
             <Input name="notas" />
