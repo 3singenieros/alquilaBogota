@@ -5,9 +5,12 @@ import { requireCompletedProfile } from "@/services/auth.service";
 import {
   addRoleToProfile,
   findProfileByLookup,
+  getProfileForSession,
   updateActiveRole,
+  updateProfile,
 } from "@/services/profile.service";
 import type { Rol } from "@/types";
+import type { RoleProfileData } from "@/types/profile";
 import { revalidatePath } from "next/cache";
 
 function profileRefFromUsuario(usuario: {
@@ -39,6 +42,11 @@ async function refreshAfterProfileChange(
   );
 }
 
+export async function getCurrentProfileAction() {
+  const { usuario } = await requireCompletedProfile();
+  return getProfileForSession(profileRefFromUsuario(usuario));
+}
+
 export async function updateActiveRoleAction(role: Rol) {
   const { usuario } = await requireCompletedProfile();
   await updateActiveRole(profileRefFromUsuario(usuario), role);
@@ -46,9 +54,30 @@ export async function updateActiveRoleAction(role: Rol) {
   revalidatePath("/", "layout");
 }
 
-export async function addRoleAction(role: Rol) {
+export async function addRoleAction(
+  role: Rol,
+  data: RoleProfileData,
+  setAsActive = false
+) {
   const { usuario } = await requireCompletedProfile();
-  await addRoleToProfile(profileRefFromUsuario(usuario), role);
+  await addRoleToProfile(profileRefFromUsuario(usuario), role, data, {
+    setAsActive,
+  });
   await refreshAfterProfileChange(usuario);
   revalidatePath("/", "layout");
+}
+
+export async function updateProfileAction(data: {
+  nombre?: string;
+  telefono?: string;
+  tipoDocumento?: RoleProfileData["tipoDocumento"];
+  numeroDocumento?: string;
+  direccionNotificaciones?: string;
+  correoNotificaciones?: string;
+}) {
+  const { usuario } = await requireCompletedProfile();
+  const profile = await updateProfile(profileRefFromUsuario(usuario), data);
+  await refreshAfterProfileChange(usuario);
+  revalidatePath("/", "layout");
+  return profile;
 }

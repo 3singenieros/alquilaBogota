@@ -10,7 +10,7 @@ import { auditActorFromUsuario, getAuditActor } from "@/lib/audit/actor";
 import { traceEvento } from "@/lib/audit/trace-helper";
 import { getProfileRepository } from "@/repositories";
 import type { Rol } from "@/types";
-import type { CreateProfileInput, UserProfile } from "@/types/profile";
+import type { CreateProfileInput, RoleProfileData, UserProfile } from "@/types/profile";
 
 export type ProfileLookup = {
   userId: string;
@@ -106,11 +106,21 @@ export async function updateActiveRole(ref: ProfileLookup, role: Rol) {
     estadoNuevo: role,
     valoresAnteriores: { rolActivo: anterior },
     valoresNuevos: { rolActivo: role },
+    metadata: {
+      email: profile.email,
+      rolAnterior: anterior,
+      rolNuevo: role,
+    },
   });
   return updated;
 }
 
-export async function addRoleToProfile(ref: ProfileLookup, role: Rol) {
+export async function addRoleToProfile(
+  ref: ProfileLookup,
+  role: Rol,
+  data?: RoleProfileData,
+  options?: { setAsActive?: boolean }
+) {
   if (role === "ADMIN") {
     throw new AuthError("El rol ADMIN no puede agregarse desde la app", "FORBIDDEN");
   }
@@ -124,17 +134,96 @@ export async function addRoleToProfile(ref: ProfileLookup, role: Rol) {
   if (profile.roles.includes(role)) {
     return profile;
   }
+
+  if (!data?.tipoDocumento || !data.numeroDocumento?.trim()) {
+    throw new AuthError("Completa los datos mínimos para agregar el rol", "FORBIDDEN");
+  }
+
   const roles = [...profile.roles, role] as Rol[];
-  const updated = await getProfileRepository().update(profile.id, { roles });
+  const patch: Partial<UserProfile> = {
+    roles,
+    telefono: data.telefono.trim() || profile.telefono,
+    tipoDocumento: data.tipoDocumento,
+    numeroDocumento: data.numeroDocumento.trim(),
+    direccionNotificaciones: data.direccionNotificaciones.trim(),
+    correoNotificaciones: data.correoNotificaciones.trim().toLowerCase(),
+  };
+  if (options?.setAsActive) {
+    patch.rolActivo = role;
+  }
+
+  const updated = await getProfileRepository().update(profile.id, patch);
   const actor = await getAuditActor();
   await traceEvento(actor, {
     entidadTipo: "USUARIO",
     entidadId: profile.id,
     accion: "ROL_AGREGADO",
     descripcion: `Rol agregado: ${role}`,
-    valoresNuevos: { roles },
+    valoresNuevos: { roles, rolActivo: patch.rolActivo ?? profile.rolActivo },
+    metadata: {
+      email: profile.email,
+      rolAgregado: role,
+      activarRol: options?.setAsActive ?? false,
+    },
   });
   return updated ?? profile;
+}
+
+export async function updateProfile(
+  ref: ProfileLookup,
+  data: {
+    nombre?: string;
+    telefono?: string;
+    tipoDocumento?: UserProfile["tipoDocumento"];
+    numeroDocumento?: string;
+    direccionNotificaciones?: string;
+    correoNotificaciones?: string;
+  }
+) {
+  const profile = await findProfileByLookup(ref);
+  if (!profile) {
+    throw new AuthError("Perfil no encontrado", "FORBIDDEN");
+  }
+
+  const patch = {
+    ...(data.nombre !== undefined ? { nombre: data.nombre.trim() } : {}),
+    ...(data.telefono !== undefined ? { telefono: data.telefono.trim() || undefined } : {}),
+    ...(data.tipoDocumento !== undefined ? { tipoDocumento: data.tipoDocumento } : {}),
+    ...(data.numeroDocumento !== undefined
+      ? { numeroDocumento: data.numeroDocumento.trim() || undefined }
+      : {}),
+    ...(data.direccionNotificaciones !== undefined
+      ? { direccionNotificaciones: data.direccionNotificaciones.trim() || undefined }
+      : {}),
+    ...(data.correoNotificaciones !== undefined
+      ? {
+          correoNotificaciones:
+            data.correoNotificaciones.trim().toLowerCase() || undefined,
+        }
+      : {}),
+  };
+
+  const updated = await getProfileRepository().update(profile.id, patch);
+  const actor = await getAuditActor();
+  await traceEvento(actor, {
+    entidadTipo: "USUARIO",
+    entidadId: profile.id,
+    accion: "PERFIL_ACTUALIZADO",
+    descripcion: "Datos de perfil actualizados",
+    valoresAnteriores: {
+      nombre: profile.nombre,
+      telefono: profile.telefono,
+      tipoDocumento: profile.tipoDocumento,
+      numeroDocumento: profile.numeroDocumento,
+    },
+    valoresNuevos: patch,
+    metadata: { email: profile.email },
+  });
+  return updated ?? profile;
+}
+
+export async function getProfileForSession(ref: ProfileLookup) {
+  return findProfileByLookup(ref);
 }
 
 export async function completeOnboarding(

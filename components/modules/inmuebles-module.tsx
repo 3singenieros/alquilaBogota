@@ -7,6 +7,7 @@ import {
 } from "@/app/(dashboard)/inmuebles/actions";
 import { listarHistorialInmuebleAction } from "@/app/(dashboard)/trazabilidad/actions";
 import { HistorialTimeline } from "@/components/trazabilidad/historial-timeline";
+import { ArrendadorSinInmueblesState } from "@/components/shared/arrendatario-sin-vinculos-state";
 import { FilterBar } from "@/components/shared/filter-bar";
 import { StatusBadge, estadoVariant } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -114,6 +115,10 @@ export function InmueblesModule({
         }
       />
 
+      {items.length === 0 ? (
+        <ArrendadorSinInmueblesState />
+      ) : (
+        <>
       <FilterBar
         search={search}
         onSearchChange={setSearch}
@@ -186,6 +191,8 @@ export function InmueblesModule({
           ))}
         </tbody>
       </Table>
+        </>
+      )}
 
       <Modal
         open={historialOpen}

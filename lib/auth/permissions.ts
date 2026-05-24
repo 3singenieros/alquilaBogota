@@ -12,7 +12,8 @@ export type AppModule =
   | "solicitudes-contrato"
   | "usuarios"
   | "trazabilidad"
-  | "reportes";
+  | "reportes"
+  | "perfil";
 
 export type ModulePermissions = {
   canCreate: boolean;
@@ -33,6 +34,7 @@ const MODULE_ACCESS: Record<AppModule, Rol[]> = {
   usuarios: ["ADMIN"],
   trazabilidad: ["ADMIN", "ARRENDADOR"],
   reportes: ["ADMIN", "ARRENDADOR", "ARRENDATARIO"],
+  perfil: ["ADMIN", "ARRENDADOR", "ARRENDATARIO"],
 };
 
 const PATH_MODULE: Record<string, AppModule> = {
@@ -49,6 +51,7 @@ const PATH_MODULE: Record<string, AppModule> = {
   "/usuarios": "usuarios",
   "/trazabilidad": "trazabilidad",
   "/reportes": "reportes",
+  "/perfil": "perfil",
 };
 
 export const NAV_ITEMS: {
@@ -77,6 +80,12 @@ export const NAV_ITEMS: {
     href: "/reportes",
     label: "Reportes",
     module: "reportes",
+    roles: ["ADMIN", "ARRENDADOR", "ARRENDATARIO"],
+  },
+  {
+    href: "/perfil",
+    label: "Mi perfil",
+    module: "perfil",
     roles: ["ADMIN", "ARRENDADOR", "ARRENDATARIO"],
   },
 ];

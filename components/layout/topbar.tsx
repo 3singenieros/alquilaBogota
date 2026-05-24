@@ -2,15 +2,18 @@
 
 import { LogoutButton } from "@/components/layout/logout-button";
 import { RoleControls } from "@/components/layout/role-controls";
+import type { UserProfile } from "@/types/profile";
 import type { Usuario } from "@/types";
 import { Menu, Search } from "lucide-react";
 
 export function Topbar({
   onMenuClick,
   usuario,
+  profile,
 }: {
   onMenuClick: () => void;
   usuario: Usuario;
+  profile?: UserProfile | null;
 }) {
   return (
     <header className="sticky top-0 z-30 flex h-16 items-center gap-4 border-b border-[var(--border)] bg-white/80 px-4 backdrop-blur md:px-6">
@@ -32,7 +35,7 @@ export function Topbar({
         />
       </div>
       <div className="ml-auto flex items-center gap-3">
-        <RoleControls usuario={usuario} />
+        <RoleControls usuario={usuario} profile={profile} />
         <div className="flex items-center gap-2 rounded-lg bg-slate-50 px-3 py-2">
           {usuario.photoURL ? (
             // eslint-disable-next-line @next/next/no-img-element

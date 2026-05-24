@@ -1,5 +1,7 @@
 export type Rol = "ADMIN" | "ARRENDADOR" | "ARRENDATARIO";
 
+export type TipoDocumento = "CC" | "CE" | "NIT" | "PASAPORTE" | "OTRO";
+
 export type EstadoContrato =
   | "BORRADOR"
   | "PENDIENTE_CONFIRMACION"
@@ -120,6 +122,10 @@ export interface Usuario {
   roles: Rol[];
   rolActivo: Rol;
   telefono?: string;
+  tipoDocumento?: TipoDocumento;
+  numeroDocumento?: string;
+  direccionNotificaciones?: string;
+  correoNotificaciones?: string;
   activo: boolean;
   creadoEn: string;
   photoURL?: string;

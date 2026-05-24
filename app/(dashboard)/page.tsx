@@ -1,6 +1,9 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { StatusBadge, estadoVariant } from "@/components/ui/badge";
-import { ArrendatarioSinVinculosState } from "@/components/shared/arrendatario-sin-vinculos-state";
+import {
+  ArrendatarioSinVinculosState,
+  ArrendadorSinInmueblesState,
+} from "@/components/shared/arrendatario-sin-vinculos-state";
 import { getNavAccessSummary } from "@/services/access-control.service";
 import {
   getActividadReciente,
@@ -120,6 +123,7 @@ export default async function DashboardPage() {
       </div>
 
       {navAccess.arrendatarioSinVinculos && <ArrendatarioSinVinculosState />}
+      {navAccess.arrendadorSinInmuebles && <ArrendadorSinInmueblesState />}
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         {stats.map((s) => (

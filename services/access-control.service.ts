@@ -359,6 +359,8 @@ export async function getNavAccessSummary() {
 
   return {
     arrendatarioSinVinculos,
+    arrendadorSinInmuebles:
+      rol === "ARRENDADOR" && ctx.inmuebleIds.size === 0,
     tieneContratosConfirmados: contratosConfirmados.length > 0,
     tieneInvitacionesPendientes: ctx.tieneInvitacionesPendientes,
   };

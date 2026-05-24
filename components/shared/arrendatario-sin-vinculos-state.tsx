@@ -23,6 +23,28 @@ export function ArrendatarioSinVinculosState() {
   );
 }
 
+export function ArrendadorSinInmueblesState() {
+  return (
+    <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50/80 p-8 text-center">
+      <h2 className="text-lg font-semibold text-slate-900">
+        No tienes inmuebles registrados
+      </h2>
+      <p className="mx-auto mt-2 max-w-md text-sm text-slate-600">
+        Crea tu primer inmueble para iniciar un contrato y gestionar arrendamientos como
+        arrendador.
+      </p>
+      <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
+        <Link href="/perfil">
+          <Button variant="secondary">Ver perfil</Button>
+        </Link>
+        <Link href="/inmuebles">
+          <Button>Ir a inmuebles</Button>
+        </Link>
+      </div>
+    </div>
+  );
+}
+
 export function TrazabilidadVaciaState() {
   return (
     <p className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-8 text-center text-sm text-slate-600">

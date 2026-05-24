@@ -1,4 +1,4 @@
-import type { Rol } from "@/types";
+import type { Rol, TipoDocumento } from "@/types";
 
 export interface UserProfile {
   id: string;
@@ -8,10 +8,22 @@ export interface UserProfile {
   roles: Rol[];
   rolActivo: Rol;
   telefono?: string;
+  tipoDocumento?: TipoDocumento;
+  numeroDocumento?: string;
+  direccionNotificaciones?: string;
+  correoNotificaciones?: string;
   perfilCompletado: boolean;
   creadoEn: string;
   actualizadoEn?: string;
 }
+
+export type RoleProfileData = {
+  tipoDocumento: TipoDocumento;
+  numeroDocumento: string;
+  telefono: string;
+  direccionNotificaciones: string;
+  correoNotificaciones: string;
+};
 
 export type CreateProfileInput = Omit<UserProfile, "id" | "creadoEn" | "actualizadoEn"> &
   Partial<Pick<UserProfile, "id" | "creadoEn">>;

@@ -4,18 +4,23 @@ import { InviteRoleBanner } from "@/components/layout/invite-role-banner";
 import { Sidebar } from "@/components/layout/sidebar";
 import { Topbar } from "@/components/layout/topbar";
 import type { Usuario } from "@/types";
+import type { UserProfile } from "@/types/profile";
 import { useState, type ReactNode } from "react";
 
 export function AppShell({
   children,
   usuario,
+  profile = null,
   pendingInviteCount = 0,
   arrendatarioSinVinculos = false,
+  arrendadorSinInmuebles = false,
 }: {
   children: ReactNode;
   usuario: Usuario;
+  profile?: UserProfile | null;
   pendingInviteCount?: number;
   arrendatarioSinVinculos?: boolean;
+  arrendadorSinInmuebles?: boolean;
 }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const roles = usuario.roles ?? [usuario.rol];
@@ -35,7 +40,7 @@ export function AppShell({
           pendingCount={pendingInviteCount}
           hasArrendatarioRole={hasArrendatarioRole}
         />
-        <Topbar onMenuClick={() => setSidebarOpen(true)} usuario={usuario} />
+        <Topbar onMenuClick={() => setSidebarOpen(true)} usuario={usuario} profile={profile} />
         <main className="flex-1 p-4 md:p-6">{children}</main>
       </div>
     </div>
