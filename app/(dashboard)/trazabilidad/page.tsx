@@ -3,5 +3,5 @@ import { listarEventos } from "@/services/trazabilidad.service";
 
 export default async function TrazabilidadPage() {
   const eventos = await listarEventos();
-  return <TrazabilidadModule initialData={eventos} />;
+  return <TrazabilidadModule initialData={eventos} showEmptyHint={eventos.length === 0} />;
 }

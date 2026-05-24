@@ -8,10 +8,13 @@ import {
   generarComunicacionNoRenovacionAction,
   obtenerContextoNoRenovacionAction,
   obtenerDatosPdfNoRenovacionAction,
+  listarHistorialNoRenovacionAction,
   obtenerExpedienteNoRenovacionAction,
   registrarEnvioNoRenovacionAction,
 } from "@/app/(dashboard)/no-renovacion/actions";
+import { ExpedienteVista } from "@/components/no-renovacion/expediente-vista";
 import { NoRenovacionDownload } from "@/components/no-renovacion/no-renovacion-download";
+import { HistorialTimeline } from "@/components/shared/historial-timeline";
 import { MultiFileUploader } from "@/components/shared/multi-file-uploader";
 import type { CargadoPorAdjunto } from "@/lib/archivos-adjuntos";
 import { FilterBar } from "@/components/shared/filter-bar";
@@ -35,7 +38,15 @@ import type {
 } from "@/types";
 import type { NoRenovacionPdfData } from "@/types/no-renovacion-pdf";
 import type { RolManifestante } from "@/lib/no-renovacion-build";
-import { AlertTriangle, ChevronLeft, ChevronRight, FileText, Plus } from "lucide-react";
+import {
+  AlertTriangle,
+  ChevronLeft,
+  ChevronRight,
+  FileText,
+  History,
+  Plus,
+} from "lucide-react";
+import type { EventoTrazabilidad } from "@/types/trazabilidad";
 import { useMemo, useState, useTransition } from "react";
 
 const ALERTA_LEGAL =
@@ -80,6 +91,10 @@ export function NoRenovacionModule({
   const [search, setSearch] = useState("");
   const [estadoFilter, setEstadoFilter] = useState("");
   const [wizardOpen, setWizardOpen] = useState(false);
+  const [historicoOpen, setHistoricoOpen] = useState(false);
+  const [historicoEventos, setHistoricoEventos] = useState<EventoTrazabilidad[]>([]);
+  const [consultaOpen, setConsultaOpen] = useState(false);
+  const [consultaEventos, setConsultaEventos] = useState<EventoTrazabilidad[]>([]);
   const [step, setStep] = useState(1);
   const [pending, startTransition] = useTransition();
 
@@ -148,9 +163,26 @@ export function NoRenovacionModule({
     }
   }
 
+  async function abrirHistorico(id: string) {
+    const eventos = await listarHistorialNoRenovacionAction(id);
+    setHistoricoEventos(eventos);
+    setHistoricoOpen(true);
+  }
+
+  async function abrirExpedienteConsulta(id: string) {
+    const { expediente: exp, ...ctx } = await obtenerExpedienteNoRenovacionAction(id);
+    const eventos = await listarHistorialNoRenovacionAction(id);
+    setExpediente(exp);
+    setContexto(ctx);
+    setConsultaEventos(eventos);
+    setConsultaOpen(true);
+  }
+
   async function abrirExpediente(id: string) {
     resetWizard();
     const { expediente: exp, ...ctx } = await obtenerExpedienteNoRenovacionAction(id);
+    const eventos = await listarHistorialNoRenovacionAction(id);
+    setConsultaEventos(eventos);
     setExpediente(exp);
     setContexto(ctx);
     setContratoId(exp.contratoId);
@@ -354,13 +386,33 @@ export function NoRenovacionModule({
                     />
                   </Td>
                   <Td className="text-right">
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      onClick={() => abrirExpediente(n.id)}
-                    >
-                      <FileText className="h-3.5 w-3.5" /> Ver expediente
-                    </Button>
+                    <div className="flex justify-end gap-1 flex-wrap">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => abrirHistorico(n.id)}
+                      >
+                        <History className="h-3.5 w-3.5" /> Histórico
+                      </Button>
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => abrirExpedienteConsulta(n.id)}
+                      >
+                        <FileText className="h-3.5 w-3.5" /> Expediente
+                      </Button>
+                      {n.iniciadoPorId === usuarioId &&
+                        n.estado !== "ENVIO_REGISTRADO" &&
+                        n.estado !== "ANULADA" && (
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            onClick={() => abrirExpediente(n.id)}
+                          >
+                            Continuar
+                          </Button>
+                        )}
+                    </div>
                   </Td>
                 </Tr>
               );
@@ -368,6 +420,53 @@ export function NoRenovacionModule({
           </tbody>
         </Table>
       </div>
+
+      <Modal
+        open={historicoOpen}
+        onClose={() => setHistoricoOpen(false)}
+        title="Histórico de trazabilidad"
+        footer={
+          <Button variant="secondary" onClick={() => setHistoricoOpen(false)}>
+            Cerrar
+          </Button>
+        }
+      >
+        <HistorialTimeline eventos={historicoEventos} />
+      </Modal>
+
+      <Modal
+        open={consultaOpen}
+        onClose={() => setConsultaOpen(false)}
+        title={`Expediente ${expediente?.code ?? ""}`}
+        footer={
+          <div className="flex gap-2">
+            <Button variant="secondary" onClick={() => setConsultaOpen(false)}>
+              Cerrar
+            </Button>
+            {expediente &&
+              expediente.iniciadoPorId === usuarioId &&
+              expediente.estado === "BORRADOR" && (
+                <Button
+                  onClick={() => {
+                    setConsultaOpen(false);
+                    abrirExpediente(expediente.id);
+                  }}
+                >
+                  Continuar wizard
+                </Button>
+              )}
+          </div>
+        }
+      >
+        {expediente && contexto && (
+          <ExpedienteVista
+            expediente={expediente}
+            contrato={contexto.contrato}
+            inmueble={contexto.inmueble}
+            eventos={consultaEventos}
+          />
+        )}
+      </Modal>
 
       <Modal
         open={wizardOpen}

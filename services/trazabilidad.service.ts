@@ -1,11 +1,17 @@
 import type { AuditActor } from "@/lib/audit/actor";
-import { loadAuthContext } from "@/lib/auth/load-context";
+import { AuthError } from "@/lib/auth/errors";
+import { rolEfectivo } from "@/lib/auth/rol";
+import { canAccessContrato } from "@/lib/auth/scopes";
+import { eventoRelacionadoNoRenovacion } from "@/lib/reportes/historial-no-renovacion";
+import { getNoRenovacionRepository, getTrazabilidadRepository } from "@/repositories";
 import {
-  contratoIdsForUser,
-  inmuebleIdsForUser,
-} from "@/lib/auth/scopes";
+  assertAccessContrato,
+  assertAccessEntidad,
+  assertAccessInmueble,
+  filterTrazabilidadEvents,
+  loadAccessContext,
+} from "@/services/access-control.service";
 import { assertModuleAccess, requireSession } from "@/services/auth.service";
-import { getTrazabilidadRepository } from "@/repositories";
 import type {
   AccionTrazabilidad,
   EntidadTipoTrazabilidad,
@@ -66,22 +72,11 @@ export async function registrarCambioEstado(input: {
   });
 }
 
-async function filtrarPorAlcanceUsuario(
+export async function filtrarPorAlcanceUsuario(
   items: EventoTrazabilidad[]
 ): Promise<EventoTrazabilidad[]> {
-  const { usuario } = await requireSession();
-  if (usuario.rol === "ADMIN") return items;
-
-  const { contratos, inmuebles } = await loadAuthContext();
-  const cIds = contratoIdsForUser(usuario, contratos);
-  const iIds = inmuebleIdsForUser(usuario, inmuebles);
-
-  return items.filter(
-    (e) =>
-      (e.contratoId && cIds.has(e.contratoId)) ||
-      (e.inmuebleId && iIds.has(e.inmuebleId)) ||
-      e.usuarioId === usuario.id
-  );
+  const ctx = await loadAccessContext();
+  return filterTrazabilidadEvents(ctx, items);
 }
 
 export async function listarEventos() {
@@ -92,7 +87,7 @@ export async function listarEventos() {
 }
 
 export async function listarEventosPorContrato(contratoId: string) {
-  await requireSession();
+  await assertAccessContrato(contratoId);
   const items = await getTrazabilidadRepository().findAll();
   const scoped = await filtrarPorAlcanceUsuario(items);
   return scoped
@@ -101,7 +96,7 @@ export async function listarEventosPorContrato(contratoId: string) {
 }
 
 export async function listarEventosPorInmueble(inmuebleId: string) {
-  await requireSession();
+  await assertAccessInmueble(inmuebleId);
   const items = await getTrazabilidadRepository().findAll();
   const scoped = await filtrarPorAlcanceUsuario(items);
   return scoped
@@ -110,7 +105,7 @@ export async function listarEventosPorInmueble(inmuebleId: string) {
 }
 
 export async function listarHistorialMantenimiento(mantenimientoId: string) {
-  await requireSession();
+  await assertAccessEntidad("MANTENIMIENTO", mantenimientoId);
   const items = await getTrazabilidadRepository().findAll();
   const scoped = await filtrarPorAlcanceUsuario(items);
   return scoped
@@ -122,7 +117,7 @@ export async function listarHistorialMantenimiento(mantenimientoId: string) {
 
 /** Historial del servicio base y de todos sus pagos reportados. */
 export async function listarHistorialServicioContrato(servicioContratoId: string) {
-  await requireSession();
+  await assertAccessEntidad("SERVICIO_PUBLICO", servicioContratoId);
   const { getPagosServicioRepository } = await import("@/repositories");
   const pagos = await getPagosServicioRepository().findByServicioContratoId(
     servicioContratoId
@@ -139,11 +134,30 @@ export async function listarHistorialServicioContrato(servicioContratoId: string
     .sort((a, b) => b.fechaHora.localeCompare(a.fechaHora));
 }
 
+export async function listarHistorialNoRenovacion(noRenovacionId: string) {
+  const { usuario } = await requireSession();
+  const nr = await getNoRenovacionRepository().findById(noRenovacionId);
+  if (!nr) {
+    throw new AuthError("Expediente no encontrado", "FORBIDDEN");
+  }
+  const { getContratosRepository } = await import("@/repositories");
+  const contrato = await getContratosRepository().findById(nr.contratoId);
+  if (!contrato || !canAccessContrato(contrato, usuario)) {
+    throw new AuthError("Sin permiso sobre este expediente", "FORBIDDEN");
+  }
+
+  const items = await getTrazabilidadRepository().findAll();
+  const scoped = await filtrarPorAlcanceUsuario(items);
+  return scoped
+    .filter((e) => eventoRelacionadoNoRenovacion(e, nr))
+    .sort((a, b) => b.fechaHora.localeCompare(a.fechaHora));
+}
+
 export async function listarEventosPorEntidad(
   entidadTipo: EntidadTipoTrazabilidad,
   entidadId: string
 ) {
-  await requireSession();
+  await assertAccessEntidad(entidadTipo, entidadId);
   const items = await getTrazabilidadRepository().findAll();
   const scoped = await filtrarPorAlcanceUsuario(items);
   return scoped
@@ -154,8 +168,12 @@ export async function listarEventosPorEntidad(
 export async function listarEventosPorUsuario(usuarioId: string) {
   const { usuario } = await requireSession();
   assertModuleAccess(usuario.rol, "trazabilidad");
+  if (rolEfectivo(usuario) !== "ADMIN" && usuarioId !== usuario.id) {
+    throw new AuthError("Sin permiso para ver eventos de otro usuario", "FORBIDDEN");
+  }
   const items = await getTrazabilidadRepository().findAll();
-  return items
+  const scoped = await filtrarPorAlcanceUsuario(items);
+  return scoped
     .filter((e) => e.usuarioId === usuarioId)
     .sort((a, b) => b.fechaHora.localeCompare(a.fechaHora));
 }
@@ -172,7 +190,7 @@ export async function listarEventosPorRangoFechas(
 
 export async function listarEventosRecientes(limit = 10) {
   const { usuario } = await requireSession();
-  if (usuario.rol === "ADMIN" || usuario.rol === "ARRENDADOR") {
+  if (rolEfectivo(usuario) === "ADMIN" || rolEfectivo(usuario) === "ARRENDADOR") {
     try {
       assertModuleAccess(usuario.rol, "trazabilidad");
     } catch {
@@ -181,5 +199,7 @@ export async function listarEventosRecientes(limit = 10) {
   }
   const items = await getTrazabilidadRepository().findAll();
   const scoped = await filtrarPorAlcanceUsuario(items);
-  return scoped.slice(0, limit);
+  return scoped
+    .sort((a, b) => b.fechaHora.localeCompare(a.fechaHora))
+    .slice(0, limit);
 }

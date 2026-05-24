@@ -10,10 +10,12 @@ export function AppShell({
   children,
   usuario,
   pendingInviteCount = 0,
+  arrendatarioSinVinculos = false,
 }: {
   children: ReactNode;
   usuario: Usuario;
   pendingInviteCount?: number;
+  arrendatarioSinVinculos?: boolean;
 }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const roles = usuario.roles ?? [usuario.rol];
@@ -26,6 +28,7 @@ export function AppShell({
         onClose={() => setSidebarOpen(false)}
         rolActivo={usuario.rolActivo ?? usuario.rol}
         roles={roles}
+        arrendatarioSinVinculos={arrendatarioSinVinculos}
       />
       <div className="flex min-w-0 flex-1 flex-col lg:pl-0">
         <InviteRoleBanner

@@ -16,6 +16,7 @@ import {
   type ActualizarDatosFormalesContratoInput,
   type RegistrarEnvioNoRenovacionInput,
 } from "@/services/no-renovacion.service";
+import { listarHistorialNoRenovacion } from "@/services/trazabilidad.service";
 import { revalidateNotificacionDependents } from "@/lib/revalidate-paths";
 import type { RolManifestante } from "@/lib/no-renovacion-build";
 import type { UpdateInput, NoRenovacion } from "@/types";
@@ -46,6 +47,10 @@ export async function crearExpedienteNoRenovacionAction(
 
 export async function obtenerExpedienteNoRenovacionAction(id: string) {
   return obtenerExpedienteNoRenovacion(id);
+}
+
+export async function listarHistorialNoRenovacionAction(id: string) {
+  return listarHistorialNoRenovacion(id);
 }
 
 export async function actualizarExpedienteNoRenovacionAction(

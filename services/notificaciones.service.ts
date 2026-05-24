@@ -2,31 +2,40 @@ import { getAuditActor, SYSTEM_ACTOR } from "@/lib/audit/actor";
 import { auditActorFromUsuario } from "@/lib/audit/actor";
 import { inferirContextoTrazabilidad } from "@/lib/audit/context";
 import { traceCambioEstado, traceEvento } from "@/lib/audit/trace-helper";
+import { rolEfectivo } from "@/lib/auth/rol";
+import { filterNotificaciones, loadAccessContext } from "@/services/access-control.service";
 import { assertModuleAccess, requireSession } from "@/services/auth.service";
 import { getNotificacionesRepository } from "@/repositories";
 import type { CreateInput, Notificacion, Rol } from "@/types";
 
+function emailNorm(email: string): string {
+  return email.trim().toLowerCase();
+}
+
+/** @deprecated Preferir filterNotificaciones con AccessContext en servicios nuevos */
 export function filtroNotificacionesPorRol(
   items: Notificacion[],
   rol: Rol,
-  usuarioEmail: string
+  usuarioEmail: string,
+  contratoIds?: Set<string>
 ): Notificacion[] {
   if (rol === "ADMIN") return items;
-  return items.filter(
-    (n) =>
-      n.destinatarioEmail === usuarioEmail ||
-      n.rolDestinatario === rol
-  );
+  const email = emailNorm(usuarioEmail);
+  return items.filter((n) => {
+    if (emailNorm(n.destinatarioEmail) === email) return true;
+    if (n.contratoId && contratoIds?.has(n.contratoId)) return true;
+    return false;
+  });
 }
 
 export async function listarNotificaciones() {
   const { usuario } = await requireSession();
   assertModuleAccess(usuario.rol, "notificaciones");
+  const ctx = await loadAccessContext(usuario);
   const items = await getNotificacionesRepository().findAll();
-  return filtroNotificacionesPorRol(
-    items.sort((a, b) => b.fechaCreacion.localeCompare(a.fechaCreacion)),
-    usuario.rol,
-    usuario.email
+  return filterNotificaciones(
+    ctx,
+    items.sort((a, b) => b.fechaCreacion.localeCompare(a.fechaCreacion))
   );
 }
 

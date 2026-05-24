@@ -1,6 +1,7 @@
 "use client";
 
 import { FilterBar } from "@/components/shared/filter-bar";
+import { TrazabilidadVaciaState } from "@/components/shared/arrendatario-sin-vinculos-state";
 import { StatusBadge } from "@/components/ui/badge";
 import { PageHeader } from "@/components/ui/page-header";
 import { Table, Td, Th, Tr } from "@/components/ui/table";
@@ -31,8 +32,10 @@ const ROLES: RolAuditoria[] = ["ADMIN", "ARRENDADOR", "ARRENDATARIO", "SISTEMA"]
 
 export function TrazabilidadModule({
   initialData,
+  showEmptyHint = false,
 }: {
   initialData: EventoTrazabilidad[];
+  showEmptyHint?: boolean;
 }) {
   const [items] = useState(initialData);
   const [search, setSearch] = useState("");
@@ -90,6 +93,10 @@ export function TrazabilidadModule({
         title="Trazabilidad"
         description="Bitácora de eventos y cambios de estado — preparada para reportes por contrato o inmueble"
       />
+      {showEmptyHint && items.length === 0 ? (
+        <TrazabilidadVaciaState />
+      ) : (
+        <>
       <div className="mb-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <input
           placeholder="Filtrar contratoId (ej. ctr-1)"
@@ -190,6 +197,8 @@ export function TrazabilidadModule({
           )}
         </tbody>
       </Table>
+        </>
+      )}
     </>
   );
 }

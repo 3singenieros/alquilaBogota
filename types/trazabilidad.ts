@@ -59,7 +59,9 @@ export type AccionTrazabilidad =
   | "NOTIFICACION_SIMULADA"
   | "ONBOARDING_COMPLETADO"
   | "ROL_ACTIVO_CAMBIADO"
-  | "ROL_AGREGADO";
+  | "ROL_AGREGADO"
+  | "REPORTE_GENERADO"
+  | "ACCESO_DENEGADO";
 
 export type RolAuditoria = Rol | "SISTEMA";
 

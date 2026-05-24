@@ -46,15 +46,31 @@ export function Sidebar({
   onClose,
   rolActivo,
   roles,
+  arrendatarioSinVinculos = false,
 }: {
   open: boolean;
   onClose: () => void;
   rolActivo: Rol;
   roles: Rol[];
+  arrendatarioSinVinculos?: boolean;
 }) {
   const pathname = usePathname();
+  const ocultarParaArrendatarioSinVinculos = new Set([
+    "/pagos",
+    "/servicios",
+    "/mantenimiento",
+    "/no-renovacion",
+    "/reportes",
+  ]);
   const nav = NAV_ITEMS.filter((item) => {
     if (!item.roles.includes(rolActivo)) return false;
+    if (
+      arrendatarioSinVinculos &&
+      rolActivo === "ARRENDATARIO" &&
+      ocultarParaArrendatarioSinVinculos.has(item.href)
+    ) {
+      return false;
+    }
     if (item.href === "/contratos" && roles.includes("ARRENDATARIO") && !roles.includes("ARRENDADOR") && rolActivo === "ARRENDATARIO") {
       return false;
     }

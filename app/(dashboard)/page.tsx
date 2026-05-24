@@ -1,5 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { StatusBadge, estadoVariant } from "@/components/ui/badge";
+import { ArrendatarioSinVinculosState } from "@/components/shared/arrendatario-sin-vinculos-state";
+import { getNavAccessSummary } from "@/services/access-control.service";
 import {
   getActividadReciente,
   getDashboardResumen,
@@ -39,10 +41,11 @@ const STATS_BY_ROL: Record<
 
 export default async function DashboardPage() {
   const session = await requireSession();
-  const [resumen, actividad, incidencias] = await Promise.all([
+  const [resumen, actividad, incidencias, navAccess] = await Promise.all([
     getDashboardResumen(),
     getActividadReciente(),
     getIncidencias(),
+    getNavAccessSummary(),
   ]);
 
   const allStats = [
@@ -115,6 +118,8 @@ export default async function DashboardPage() {
           Resumen para {session.usuario.nombre} ({session.usuario.rol})
         </p>
       </div>
+
+      {navAccess.arrendatarioSinVinculos && <ArrendatarioSinVinculosState />}
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         {stats.map((s) => (

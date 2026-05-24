@@ -2,6 +2,7 @@ import { seedIncidencias } from "@/data/mock/seed";
 import { listarEventosRecientes } from "@/services/trazabilidad.service";
 import { contratoProximoAVencer, preavisoVencido } from "@/lib/contrato-alertas";
 import { loadAuthContext } from "@/lib/auth/load-context";
+import { rolEfectivo } from "@/lib/auth/rol";
 import { fechaHoy } from "@/lib/servicios-estado";
 import {
   contratoIdsForUser,
@@ -11,6 +12,7 @@ import {
   filterPagos,
   filterPagosServicio,
 } from "@/lib/auth/scopes";
+import { loadAccessContext } from "@/services/access-control.service";
 import { assertModuleAccess, requireSession } from "@/services/auth.service";
 import {
   getInvitacionesContratoRepository,
@@ -74,8 +76,9 @@ export async function getDashboardResumen() {
   );
   const notificaciones = filtroNotificacionesPorRol(
     notificacionesAll,
-    usuario.rol,
-    usuario.email
+    rolEfectivo(usuario),
+    usuario.email,
+    contratoIds
   );
 
   const contratosActivosList = contratosScope.filter((c) => c.estado === "CONFIRMADO");
@@ -152,8 +155,13 @@ export async function getActividadReciente() {
 }
 
 export async function getIncidencias() {
-  const { usuario } = await requireSession();
-  const modulos = ACTIVIDAD_POR_ROL[usuario.rol];
+  const ctx = await loadAccessContext();
+  const rol = rolEfectivo(ctx.usuario);
+  if (rol === "ARRENDATARIO" && ctx.contratoIds.size === 0) return [];
+  if (rol === "ARRENDADOR" && ctx.contratoIds.size === 0 && ctx.inmuebleIds.size === 0) {
+    return [];
+  }
+  const modulos = ACTIVIDAD_POR_ROL[rol];
   return seedIncidencias.filter((i) => modulos.includes(i.modulo));
 }
 
