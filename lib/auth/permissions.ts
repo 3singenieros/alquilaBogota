@@ -60,7 +60,12 @@ export const NAV_ITEMS: {
   { href: "/pagos", label: "Pagos reportados", module: "pagos", roles: ["ADMIN", "ARRENDADOR", "ARRENDATARIO"] },
   { href: "/servicios", label: "Servicios públicos", module: "servicios", roles: ["ADMIN", "ARRENDADOR", "ARRENDATARIO"] },
   { href: "/mantenimiento", label: "Mantenimiento", module: "mantenimiento", roles: ["ADMIN", "ARRENDADOR", "ARRENDATARIO"] },
-  { href: "/no-renovacion", label: "No renovación", module: "no-renovacion", roles: ["ADMIN", "ARRENDADOR"] },
+  {
+    href: "/no-renovacion",
+    label: "No renovación",
+    module: "no-renovacion",
+    roles: ["ADMIN", "ARRENDADOR", "ARRENDATARIO"],
+  },
   { href: "/notificaciones", label: "Notificaciones", module: "notificaciones", roles: ["ADMIN", "ARRENDADOR", "ARRENDATARIO"] },
   { href: "/solicitudes-contrato", label: "Solicitudes contrato", module: "solicitudes-contrato", roles: ["ADMIN", "ARRENDATARIO"] },
   { href: "/usuarios", label: "Usuarios y roles", module: "usuarios", roles: ["ADMIN"] },

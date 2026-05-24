@@ -1,38 +1,103 @@
 "use server";
 
 import {
-  actualizarNoRenovacion,
-  crearNoRenovacion,
-  eliminarNoRenovacion,
-  simularEnvioNotificacionNoRenovacion,
+  actualizarDatosFormalesContrato,
+  actualizarExpedienteNoRenovacion,
+  anularExpedienteNoRenovacion,
+  crearExpedienteNoRenovacion,
+  generarComunicacionNoRenovacion,
+  listarContratosElegiblesNoRenovacion,
+  obtenerContextoExpediente,
+  obtenerDatosPdfNoRenovacion,
+  obtenerExpedienteNoRenovacion,
+  registrarDescargaPdfNoRenovacion,
+  registrarEnvioNoRenovacion,
+  sincronizarPartesExpediente,
+  type ActualizarDatosFormalesContratoInput,
+  type RegistrarEnvioNoRenovacionInput,
 } from "@/services/no-renovacion.service";
 import { revalidateNotificacionDependents } from "@/lib/revalidate-paths";
-import type { CreateInput, NoRenovacion, UpdateInput } from "@/types";
+import type { RolManifestante } from "@/lib/no-renovacion-build";
+import type { UpdateInput, NoRenovacion } from "@/types";
 import { revalidatePath } from "next/cache";
 
-export async function crearNoRenovacionAction(data: CreateInput<NoRenovacion>) {
-  const created = await crearNoRenovacion(data);
+function revalidateAll() {
   revalidatePath("/no-renovacion");
+  revalidatePath("/contratos");
+  revalidateNotificacionDependents();
+}
+
+export async function listarContratosNoRenovacionAction() {
+  return listarContratosElegiblesNoRenovacion();
+}
+
+export async function obtenerContextoNoRenovacionAction(contratoId: string) {
+  return obtenerContextoExpediente(contratoId);
+}
+
+export async function crearExpedienteNoRenovacionAction(
+  contratoId: string,
+  manifestante?: RolManifestante
+) {
+  const created = await crearExpedienteNoRenovacion(contratoId, manifestante);
+  revalidateAll();
   return created;
 }
 
-export async function actualizarNoRenovacionAction(
+export async function obtenerExpedienteNoRenovacionAction(id: string) {
+  return obtenerExpedienteNoRenovacion(id);
+}
+
+export async function actualizarExpedienteNoRenovacionAction(
   id: string,
   data: UpdateInput<NoRenovacion>
 ) {
-  const updated = await actualizarNoRenovacion(id, data);
+  const updated = await actualizarExpedienteNoRenovacion(id, data);
+  revalidateAll();
+  return updated;
+}
+
+export async function actualizarDatosFormalesContratoAction(
+  contratoId: string,
+  datos: ActualizarDatosFormalesContratoInput
+) {
+  const updated = await actualizarDatosFormalesContrato(contratoId, datos);
+  revalidatePath("/contratos");
   revalidatePath("/no-renovacion");
   return updated;
 }
 
-export async function eliminarNoRenovacionAction(id: string) {
-  await eliminarNoRenovacion(id);
-  revalidatePath("/no-renovacion");
+export async function sincronizarPartesExpedienteAction(id: string) {
+  const updated = await sincronizarPartesExpediente(id);
+  revalidateAll();
+  return updated;
 }
 
-export async function simularEnvioNotificacionNoRenovacionAction(id: string) {
-  const updated = await simularEnvioNotificacionNoRenovacion(id);
-  revalidatePath("/no-renovacion");
-  revalidateNotificacionDependents();
+export async function generarComunicacionNoRenovacionAction(id: string) {
+  const updated = await generarComunicacionNoRenovacion(id);
+  revalidateAll();
+  return updated;
+}
+
+export async function registrarDescargaPdfNoRenovacionAction(id: string) {
+  await registrarDescargaPdfNoRenovacion(id);
+}
+
+export async function obtenerDatosPdfNoRenovacionAction(id: string) {
+  return obtenerDatosPdfNoRenovacion(id);
+}
+
+export async function registrarEnvioNoRenovacionAction(
+  id: string,
+  input: RegistrarEnvioNoRenovacionInput
+) {
+  const updated = await registrarEnvioNoRenovacion(id, input);
+  revalidateAll();
+  return updated;
+}
+
+export async function anularExpedienteNoRenovacionAction(id: string) {
+  const updated = await anularExpedienteNoRenovacion(id);
+  revalidateAll();
   return updated;
 }

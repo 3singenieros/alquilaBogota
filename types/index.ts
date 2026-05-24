@@ -34,7 +34,22 @@ export type EstadoMantenimiento =
   | "RESUELTO"
   | "CERRADO"
   | "RECHAZADO";
-export type EstadoNoRenovacion = "SOLICITADA" | "EN_REVISION" | "ACEPTADA" | "RECHAZADA";
+export type EstadoNoRenovacion =
+  | "BORRADOR"
+  | "PENDIENTE_GENERACION"
+  | "DOCUMENTO_GENERADO"
+  | "ENVIO_REGISTRADO"
+  | "ANULADA";
+
+export type EstadoEnvioNoRenovacion = "PENDIENTE" | "REGISTRADO" | "ERROR";
+
+export type MedioEnvioNoRenovacion =
+  | "CORREO_CERTIFICADO"
+  | "EMAIL"
+  | "FISICO"
+  | "OTRO";
+
+export type OrigenNoRenovacion = "ARRENDADOR" | "ARRENDATARIO";
 export type EstadoDepositoGarantia = "PENDIENTE" | "DEVUELTO" | "APLICADO";
 export type EstadoNotificacion = "PENDIENTE" | "SIMULADA" | "ERROR";
 export type EstadoNotificacionEnvio = "PENDIENTE" | "SIMULADA" | "ERROR";
@@ -156,6 +171,19 @@ export interface Contrato {
   observacionesEntrega?: string;
   motivoRechazo?: string;
   creadoEn: string;
+  nombreArrendador?: string;
+  tipoDocumentoArrendador?: string;
+  numeroDocumentoArrendador?: string;
+  correoNotificacionesArrendador?: string;
+  direccionNotificacionesArrendador?: string;
+  tipoDocumentoArrendatario?: string;
+  numeroDocumentoArrendatario?: string;
+  correoNotificacionesArrendatario?: string;
+  direccionNotificacionesArrendatario?: string;
+  noRenovar?: boolean;
+  fechaNoRenovacionRegistrada?: string;
+  origenNoRenovacion?: OrigenNoRenovacion;
+  noRenovacionId?: string;
 }
 
 export interface InvitacionContrato {
@@ -278,19 +306,37 @@ export interface NoRenovacion {
   id: string;
   code: string;
   contratoId: string;
-  motivo: string;
-  fechaSolicitud: string;
+  inmuebleId: string;
+  iniciadoPorId: string;
+  iniciadoPorNombre: string;
+  iniciadoPorEmail: string;
+  iniciadoPorRol: Rol;
+  destinatarioNombre: string;
+  destinatarioEmail: string;
+  destinatarioTipoDocumento: string;
+  destinatarioNumeroDocumento: string;
+  destinatarioDireccionNotificacion?: string;
+  remitenteNombre: string;
+  remitenteEmail: string;
+  remitenteTipoDocumento: string;
+  remitenteNumeroDocumento: string;
+  remitenteDireccionNotificacion?: string;
+  fechaCreacion: string;
+  fechaGeneracionDocumento?: string;
+  fechaEnvioRegistrado?: string;
+  fechaFinContrato: string;
+  fechaLimitePreaviso?: string;
+  dentroDelPlazoPreaviso: boolean;
+  motivo?: string;
+  observaciones?: string;
   estado: EstadoNoRenovacion;
-  /** @deprecated Usar documentosAdjuntos */
-  documentoUrl?: string;
-  documentosAdjuntos?: ArchivoAdjunto[];
-  solicitadoPorId: string;
-  fechaLimitePreaviso: string;
-  fechaEnvioNotificacion?: string;
-  destinatarioArrendadorEmail: string;
-  destinatarioArrendatarioEmail: string;
-  estadoNotificacion: EstadoNotificacionEnvio;
-  observacionesNotificacion?: string;
+  medioEnvio?: MedioEnvioNoRenovacion;
+  numeroGuiaCorreoCertificado?: string;
+  empresaMensajeria?: string;
+  evidenciaEnvioAdjuntos?: ArchivoAdjunto[];
+  documentoNoRenovacionAdjuntos?: ArchivoAdjunto[];
+  cuerpoComunicacionGenerado?: string;
+  estadoEnvio: EstadoEnvioNoRenovacion;
 }
 
 export interface Notificacion {

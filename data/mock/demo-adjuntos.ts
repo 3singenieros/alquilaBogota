@@ -82,6 +82,20 @@ export const demoAdjuntoCierrePuerta: ArchivoAdjunto = base({
   fechaCarga: "2026-05-15T16:00:00.000Z",
 });
 
+export const demoAdjuntoGuiaCorreoCertificado: ArchivoAdjunto = base({
+  id: "adj-nr-guia-1",
+  nombre: "guia-correo-certificado-4-72.pdf",
+  tipo: "application/pdf",
+  tamano: 52000,
+  urlSimulada: "archivo:guia-correo-certificado-4-72.pdf",
+  descripcion: "Guía correo certificado 4-72",
+  cargadoPorId: "u-arrendatario",
+  cargadoPorNombre: "María Arrendataria",
+  cargadoPorEmail: "arrendatario@demo.edu",
+  cargadoPorRol: "ARRENDATARIO",
+  fechaCarga: "2026-05-16T10:00:00.000Z",
+});
+
 export const demoAdjuntoNoRenovacion: ArchivoAdjunto = base({
   id: "adj-nr-1",
   nombre: "carta-no-renovacion.pdf",
