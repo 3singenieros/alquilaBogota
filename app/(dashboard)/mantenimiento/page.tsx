@@ -14,13 +14,16 @@ export default async function MantenimientoPage() {
     listarComentariosVisibles(),
   ]);
 
+  const u = session.usuario;
   return (
     <MantenimientoModule
       initialData={items}
       initialComentarios={comentarios}
       inmuebles={inmuebles}
-      rol={session.usuario.rolActivo ?? session.usuario.rol}
-      usuarioId={session.usuario.id}
+      rol={u.rolActivo ?? u.rol}
+      usuarioId={u.id}
+      usuarioNombre={u.nombre}
+      usuarioEmail={u.email}
     />
   );
 }

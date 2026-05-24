@@ -56,7 +56,44 @@ export type TipoNotificacion =
   | "MANTENIMIENTO_ESTADO_CAMBIADO"
   | "MANTENIMIENTO_COMENTARIO"
   | "MANTENIMIENTO_CERRADO"
+  | "MANTENIMIENTO_RESPONSABILIDAD_COMPARTIDA"
+  | "MANTENIMIENTO_RESPONSABILIDAD_ACEPTADA"
+  | "MANTENIMIENTO_RESPONSABILIDAD_RECHAZADA"
   | "REAJUSTE_CANON";
+
+export interface ArchivoAdjunto {
+  id: string;
+  nombre: string;
+  tipo?: string;
+  tamano?: number;
+  urlSimulada?: string;
+  descripcion?: string;
+  fechaCarga: string;
+  cargadoPorId?: string;
+  cargadoPorNombre?: string;
+  cargadoPorEmail?: string;
+  cargadoPorRol?: Rol;
+}
+
+export type TipoResponsabilidadMantenimiento =
+  | "ARRENDADOR"
+  | "ARRENDATARIO"
+  | "COMPARTIDO"
+  | "POR_DEFINIR";
+
+export type TipoMantenimientoCategoria =
+  | "LOCATIVO"
+  | "ESTRUCTURAL"
+  | "PREVENTIVO"
+  | "CORRECTIVO"
+  | "INSPECCION"
+  | "ADMINISTRATIVO";
+
+export type AceptacionResponsabilidadMantenimiento =
+  | "PENDIENTE"
+  | "ACEPTADA"
+  | "RECHAZADA"
+  | "NO_APLICA";
 
 export interface Usuario {
   id: string;
@@ -104,7 +141,9 @@ export interface Contrato {
   porcentajeReajuste: number;
   fechaUltimoReajuste?: string;
   estado: EstadoContrato;
+  /** @deprecated Usar documentosAdjuntos */
   documentoUrl?: string;
+  documentosAdjuntos?: ArchivoAdjunto[];
   codeudorNombre?: string;
   codeudorDocumento?: string;
   codeudorTelefono?: string;
@@ -139,7 +178,9 @@ export interface PagoReportado {
   monto: number;
   fechaReporte: string;
   estado: EstadoPago;
+  /** @deprecated Usar comprobantesAdjuntos */
   comprobanteUrl?: string;
+  comprobantesAdjuntos?: ArchivoAdjunto[];
   notas?: string;
   medioPago?: string;
   reportadoPorId: string;
@@ -177,7 +218,9 @@ export interface PagoServicioPublico {
   fechaVencimiento: string;
   valorPagado: number;
   estado: EstadoPagoServicioPublico;
+  /** @deprecated Usar comprobantesAdjuntos */
   comprobanteUrl?: string;
+  comprobantesAdjuntos?: ArchivoAdjunto[];
   reportadoPorId: string;
   validadoPorId?: string;
   fechaValidacion?: string;
@@ -193,12 +236,28 @@ export interface Mantenimiento {
   descripcion: string;
   prioridad: "BAJA" | "MEDIA" | "ALTA";
   estado: EstadoMantenimiento;
+  tipoMantenimiento?: TipoMantenimientoCategoria;
+  tipoResponsabilidad?: TipoResponsabilidadMantenimiento;
+  valorEstimado?: number;
+  valorFinal?: number;
+  porcentajeArrendador?: number;
+  porcentajeArrendatario?: number;
+  valorArrendador?: number;
+  valorArrendatario?: number;
+  fechaEstimadaAtencion?: string;
+  observacionesResponsabilidad?: string;
+  observacionesCierre?: string;
+  aceptacionArrendatario?: AceptacionResponsabilidadMantenimiento;
+  motivoRechazoResponsabilidad?: string;
   solicitadoPorId: string;
   asignadoA?: string;
   observacionesGestion?: string;
   creadoEn: string;
   fechaCierre?: string;
+  /** @deprecated Usar evidenciasAdjuntas */
   adjuntoUrl?: string;
+  evidenciasAdjuntas?: ArchivoAdjunto[];
+  documentosCierreAdjuntos?: ArchivoAdjunto[];
 }
 
 export interface ComentarioMantenimiento {
@@ -222,7 +281,9 @@ export interface NoRenovacion {
   motivo: string;
   fechaSolicitud: string;
   estado: EstadoNoRenovacion;
+  /** @deprecated Usar documentosAdjuntos */
   documentoUrl?: string;
+  documentosAdjuntos?: ArchivoAdjunto[];
   solicitadoPorId: string;
   fechaLimitePreaviso: string;
   fechaEnvioNotificacion?: string;

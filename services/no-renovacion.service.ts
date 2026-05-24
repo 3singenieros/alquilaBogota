@@ -20,6 +20,8 @@ import {
 import {
   crearNotificacionesNoRenovacion,
 } from "@/services/notificaciones.service";
+import { prepararDocumentosContrato } from "@/lib/archivos-adjuntos";
+import { traceAdjuntosAgregados } from "@/lib/audit/trace-adjuntos";
 import type { CreateInput, NoRenovacion, UpdateInput } from "@/types";
 
 export async function listarNoRenovacion() {
@@ -51,8 +53,11 @@ export async function crearNoRenovacion(data: CreateInput<NoRenovacion>) {
     };
   }
 
+  const docs = prepararDocumentosContrato(data.documentosAdjuntos, data.documentoUrl);
   const created = await getNoRenovacionRepository().create({
     ...data,
+    documentosAdjuntos: docs.documentosAdjuntos,
+    documentoUrl: docs.documentoUrl,
     fechaLimitePreaviso: data.fechaLimitePreaviso || contrato.fechaLimitePreaviso,
     destinatarioArrendadorEmail:
       data.destinatarioArrendadorEmail || arrendador?.email || "",
@@ -70,6 +75,15 @@ export async function crearNoRenovacion(data: CreateInput<NoRenovacion>) {
     ctx,
     "NO_RENOVACION_SOLICITADA"
   );
+  if (docs.documentosAdjuntos.length > 0) {
+    await traceAdjuntosAgregados(actor, {
+      entidadTipo: "NO_RENOVACION",
+      entidadId: created.id,
+      adjuntos: docs.documentosAdjuntos,
+      descripcion: `Documentos de no renovación ${created.code}`,
+      contexto: ctx,
+    });
+  }
   return created;
 }
 

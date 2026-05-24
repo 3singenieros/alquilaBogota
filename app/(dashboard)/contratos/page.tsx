@@ -15,8 +15,10 @@ export default async function ContratosPage() {
       initialData={contratos}
       inmuebles={inmuebles}
       arrendatarios={usuarios.filter((u) => u.rol === "ARRENDATARIO")}
-      rol={session.usuario.rol}
+      rol={session.usuario.rolActivo ?? session.usuario.rol}
       usuarioId={session.usuario.id}
+      usuarioNombre={session.usuario.nombre}
+      usuarioEmail={session.usuario.email}
     />
   );
 }

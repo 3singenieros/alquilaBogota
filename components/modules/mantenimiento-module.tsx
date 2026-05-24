@@ -9,7 +9,10 @@ import {
 } from "@/app/(dashboard)/mantenimiento/actions";
 import { listarHistorialMantenimientoAction } from "@/app/(dashboard)/trazabilidad/actions";
 import { HistorialTimeline } from "@/components/trazabilidad/historial-timeline";
-import { SimulatedFileInput } from "@/components/shared/simulated-file-input";
+import { VerAdjuntosButton } from "@/components/shared/adjuntos-panel";
+import { MultiFileUploader } from "@/components/shared/multi-file-uploader";
+import { MantenimientoModalsEconomicos } from "@/components/mantenimiento/mantenimiento-modals-economicos";
+import type { CargadoPorAdjunto } from "@/lib/archivos-adjuntos";
 import { FilterBar } from "@/components/shared/filter-bar";
 import { StatusBadge, estadoVariant } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -29,6 +32,7 @@ import {
 } from "@/lib/mantenimiento-reglas";
 import { formatDate } from "@/lib/utils";
 import type {
+  ArchivoAdjunto,
   ComentarioMantenimiento,
   EstadoMantenimiento,
   Inmueble,
@@ -43,6 +47,9 @@ import {
   MessageSquare,
   Pencil,
   Plus,
+  DollarSign,
+  Lock,
+  CheckCircle,
 } from "lucide-react";
 import { useEffect, useMemo, useState, useTransition } from "react";
 
@@ -66,13 +73,23 @@ export function MantenimientoModule({
   inmuebles,
   rol,
   usuarioId,
+  usuarioNombre,
+  usuarioEmail,
 }: {
   initialData: Mantenimiento[];
   initialComentarios: ComentarioMantenimiento[];
   inmuebles: Inmueble[];
   rol: Rol;
   usuarioId: string;
+  usuarioNombre: string;
+  usuarioEmail: string;
 }) {
+  const cargadoPor: CargadoPorAdjunto = {
+    id: usuarioId,
+    nombre: usuarioNombre,
+    email: usuarioEmail,
+    rol,
+  };
   const perms = getModulePermissions(rol, "mantenimiento");
   const canManageEstado = arrendadorPuedeGestionarEstado(rol);
 
@@ -88,6 +105,11 @@ export function MantenimientoModule({
   const [comentarioOpen, setComentarioOpen] = useState(false);
   const [detailOpen, setDetailOpen] = useState(false);
   const [historialOpen, setHistorialOpen] = useState(false);
+  const [responsabilidadOpen, setResponsabilidadOpen] = useState(false);
+  const [cerrarOpen, setCerrarOpen] = useState(false);
+  const [aceptarOpen, setAceptarOpen] = useState(false);
+  const [evidenciasCreate, setEvidenciasCreate] = useState<ArchivoAdjunto[]>([]);
+  const [evidenciasEdit, setEvidenciasEdit] = useState<ArchivoAdjunto[]>([]);
   const [selected, setSelected] = useState<Mantenimiento | null>(null);
   const [historialEventos, setHistorialEventos] = useState<EventoTrazabilidad[]>([]);
   const [formError, setFormError] = useState<string | null>(null);
@@ -150,7 +172,7 @@ export function MantenimientoModule({
       prioridad: fd.get("prioridad") as Mantenimiento["prioridad"],
       estado: "ABIERTO" as EstadoMantenimiento,
       solicitadoPorId: usuarioId,
-      adjuntoUrl: (fd.get("adjuntoUrl") as string) || undefined,
+      evidenciasAdjuntas: evidenciasCreate,
     };
     startTransition(async () => {
       try {
@@ -158,6 +180,7 @@ export function MantenimientoModule({
         if (created) {
           setItems((prev) => [...prev, created]);
           setOpen(false);
+          setEvidenciasCreate([]);
           form.reset();
         }
       } catch (err) {
@@ -175,7 +198,8 @@ export function MantenimientoModule({
       titulo: fd.get("titulo") as string,
       descripcion: fd.get("descripcion") as string,
       prioridad: fd.get("prioridad") as Mantenimiento["prioridad"],
-      adjuntoUrl: (fd.get("adjuntoUrl") as string) || selected.adjuntoUrl,
+      evidenciasAdjuntas:
+        evidenciasEdit.length > 0 ? evidenciasEdit : selected.evidenciasAdjuntas,
     };
     startTransition(async () => {
       try {
@@ -290,6 +314,8 @@ export function MantenimientoModule({
             <Th>Inmueble</Th>
             <Th>Prioridad</Th>
             <Th>Estado</Th>
+            <Th>Responsabilidad</Th>
+            <Th>Adjuntos</Th>
             <Th>Asignado a</Th>
             <Th>Fecha</Th>
             <Th className="text-right">Acciones</Th>
@@ -298,7 +324,7 @@ export function MantenimientoModule({
         <tbody>
           {filtered.length === 0 ? (
             <tr>
-              <Td colSpan={8} className="text-center text-sm text-slate-500">
+              <Td colSpan={10} className="text-center text-sm text-slate-500">
                 No hay solicitudes de mantenimiento.
               </Td>
             </tr>
@@ -325,10 +351,24 @@ export function MantenimientoModule({
                       }
                     />
                   </Td>
-                  <Td>
-                    <StatusBadge label={m.estado} variant={estadoVariant(m.estado)} />
-                  </Td>
-                  <Td className="text-xs text-slate-600">{m.asignadoA ?? "—"}</Td>
+                <Td>
+                  <StatusBadge label={m.estado} variant={estadoVariant(m.estado)} />
+                </Td>
+                <Td className="text-xs">
+                  {m.tipoResponsabilidad ?? "POR_DEFINIR"}
+                  {m.aceptacionArrendatario === "PENDIENTE" && (
+                    <span className="block text-amber-600">Aceptación pendiente</span>
+                  )}
+                </Td>
+                <Td>
+                  <VerAdjuntosButton
+                    listas={[
+                      { etiqueta: "Evidencias", archivos: m.evidenciasAdjuntas },
+                      { etiqueta: "Cierre", archivos: m.documentosCierreAdjuntos },
+                    ]}
+                  />
+                </Td>
+                <Td className="text-xs text-slate-600">{m.asignadoA ?? "—"}</Td>
                   <Td>{formatDate(m.creadoEn)}</Td>
                   <Td className="text-right">
                     <div className="flex flex-wrap justify-end gap-1">
@@ -376,18 +416,59 @@ export function MantenimientoModule({
                         </Button>
                       )}
                       {canManageEstado && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          title="Cambiar estado"
-                          onClick={() => {
-                            selectTicket(m);
-                            setEstadoOpen(true);
-                          }}
-                        >
-                          <GitBranch className="h-4 w-4" />
-                        </Button>
+                        <>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            title="Responsabilidad económica"
+                            onClick={() => {
+                              selectTicket(m);
+                              setResponsabilidadOpen(true);
+                            }}
+                          >
+                            <DollarSign className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            title="Cambiar estado"
+                            onClick={() => {
+                              selectTicket(m);
+                              setEstadoOpen(true);
+                            }}
+                          >
+                            <GitBranch className="h-4 w-4" />
+                          </Button>
+                          {m.estado !== "CERRADO" && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              title="Cerrar ticket"
+                              onClick={() => {
+                                selectTicket(m);
+                                setCerrarOpen(true);
+                              }}
+                            >
+                              <Lock className="h-4 w-4" />
+                            </Button>
+                          )}
+                        </>
                       )}
+                      {rol === "ARRENDATARIO" &&
+                        m.tipoResponsabilidad === "COMPARTIDO" &&
+                        m.aceptacionArrendatario === "PENDIENTE" && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            title="Aceptar o rechazar distribución"
+                            onClick={() => {
+                              selectTicket(m);
+                              setAceptarOpen(true);
+                            }}
+                          >
+                            <CheckCircle className="h-4 w-4" />
+                          </Button>
+                        )}
                       <Button
                         variant="ghost"
                         size="sm"
@@ -458,9 +539,12 @@ export function MantenimientoModule({
                 <option value="ALTA">ALTA</option>
               </Select>
             </FormField>
-            <FormField label="Evidencia adjunta">
-              <SimulatedFileInput name="adjuntoUrl" label="Foto o documento (simulado)" />
-            </FormField>
+            <MultiFileUploader
+              label="Evidencias iniciales"
+              value={evidenciasCreate}
+              onChange={setEvidenciasCreate}
+              cargadoPor={cargadoPor}
+            />
           </form>
         )}
       </Modal>
@@ -512,13 +596,12 @@ export function MantenimientoModule({
                 <option value="ALTA">ALTA</option>
               </Select>
             </FormField>
-            <FormField label="Evidencia">
-              <SimulatedFileInput
-                name="adjuntoUrl"
-                label="Actualizar evidencia (simulado)"
-                defaultValue={selected.adjuntoUrl}
-              />
-            </FormField>
+            <MultiFileUploader
+              label="Evidencias"
+              value={evidenciasEdit.length ? evidenciasEdit : selected.evidenciasAdjuntas ?? []}
+              onChange={setEvidenciasEdit}
+              cargadoPor={cargadoPor}
+            />
           </form>
         )}
       </Modal>
@@ -553,13 +636,16 @@ export function MantenimientoModule({
             </p>
             <FormField label="Nuevo estado">
               <Select name="estado" defaultValue={selected.estado} required>
-                {ESTADOS_MANTENIMIENTO.map((e) => (
-                  <option key={e} value={e}>
-                    {e}
-                  </option>
-                ))}
-              </Select>
-            </FormField>
+                    {ESTADOS_MANTENIMIENTO.filter((e) => e !== "CERRADO").map((e) => (
+                      <option key={e} value={e}>
+                        {e}
+                      </option>
+                    ))}
+                  </Select>
+                </FormField>
+                <p className="text-xs text-slate-500">
+                  Para cerrar el ticket usa el botón de cierre (candado).
+                </p>
             <FormField label="Asignado a (proveedor)">
               <Input name="asignadoA" defaultValue={selected.asignadoA} />
             </FormField>
@@ -603,9 +689,6 @@ export function MantenimientoModule({
           <form id="mnt-comentario-form" onSubmit={handleComentario} className="space-y-4">
             <FormField label="Comentario">
               <Input name="comentario" required placeholder="Actualización o consulta" />
-            </FormField>
-            <FormField label="Adjunto (opcional)">
-              <SimulatedFileInput name="adjuntoUrl" label="Archivo simulado" />
             </FormField>
           </form>
         )}
@@ -658,12 +741,32 @@ export function MantenimientoModule({
                   <dd>{selected.observacionesGestion}</dd>
                 </div>
               )}
-              {selected.adjuntoUrl && (
-                <div className="sm:col-span-2">
-                  <dt className="text-slate-500">Evidencia</dt>
-                  <dd className="font-mono text-xs">{selected.adjuntoUrl}</dd>
-                </div>
-              )}
+              <div>
+                <dt className="text-slate-500">Responsabilidad / tipo</dt>
+                <dd>
+                  {selected.tipoResponsabilidad ?? "POR_DEFINIR"} ·{" "}
+                  {selected.tipoMantenimiento ?? "—"}
+                  {selected.valorEstimado != null && (
+                    <span className="block">
+                      Estimado: ${selected.valorEstimado.toLocaleString("es-CO")}
+                    </span>
+                  )}
+                  {selected.valorFinal != null && (
+                    <span className="block">
+                      Final: ${selected.valorFinal.toLocaleString("es-CO")}
+                    </span>
+                  )}
+                </dd>
+              </div>
+              <div className="sm:col-span-2">
+                <VerAdjuntosButton
+                  titulo="Adjuntos del ticket"
+                  listas={[
+                    { etiqueta: "Evidencias", archivos: selected.evidenciasAdjuntas },
+                    { etiqueta: "Cierre", archivos: selected.documentosCierreAdjuntos },
+                  ]}
+                />
+              </div>
             </dl>
 
             <div>
@@ -715,6 +818,21 @@ export function MantenimientoModule({
       >
         <HistorialTimeline eventos={historialEventos} />
       </Modal>
+
+      <MantenimientoModalsEconomicos
+        selected={selected}
+        responsabilidadOpen={responsabilidadOpen}
+        cerrarOpen={cerrarOpen}
+        aceptarOpen={aceptarOpen}
+        onCloseResponsabilidad={() => setResponsabilidadOpen(false)}
+        onCloseCerrar={() => setCerrarOpen(false)}
+        onCloseAceptar={() => setAceptarOpen(false)}
+        cargadoPor={cargadoPor}
+        onUpdated={(m) => {
+          setItems((prev) => prev.map((x) => (x.id === m.id ? { ...x, ...m } : x)));
+          setSelected(m);
+        }}
+      />
     </>
   );
 }

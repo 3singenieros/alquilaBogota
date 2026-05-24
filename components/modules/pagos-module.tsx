@@ -9,7 +9,10 @@ import {
   validarPagoAction,
 } from "@/app/(dashboard)/pagos/actions";
 import { SoportePagoDownload } from "@/components/pagos/soporte-pago-download";
-import { SimulatedFileInput } from "@/components/shared/simulated-file-input";
+import { VerAdjuntosButton } from "@/components/shared/adjuntos-panel";
+import { MultiFileUploader } from "@/components/shared/multi-file-uploader";
+import type { CargadoPorAdjunto } from "@/lib/archivos-adjuntos";
+import type { ArchivoAdjunto } from "@/types";
 import { FilterBar } from "@/components/shared/filter-bar";
 import { StatusBadge, estadoVariant } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -36,6 +39,8 @@ export function PagosModule({
   pdfPorPagoId: initialPdfMap,
   rol,
   usuarioId,
+  usuarioNombre,
+  usuarioEmail,
 }: {
   initialData: PagoReportado[];
   contratos: Contrato[];
@@ -44,7 +49,16 @@ export function PagosModule({
   pdfPorPagoId: Record<string, SoportePdfData>;
   rol: Rol;
   usuarioId: string;
+  usuarioNombre: string;
+  usuarioEmail: string;
 }) {
+  const cargadoPor: CargadoPorAdjunto = {
+    id: usuarioId,
+    nombre: usuarioNombre,
+    email: usuarioEmail,
+    rol,
+  };
+  const [comprobantes, setComprobantes] = useState<ArchivoAdjunto[]>([]);
   const perms = getModulePermissions(rol, "pagos");
   const canReview = rol === "ARRENDADOR" || rol === "ADMIN";
   const canReport = rol === "ARRENDATARIO" || rol === "ADMIN";
@@ -105,7 +119,7 @@ export function PagosModule({
       monto: Number(fd.get("monto")),
       fechaReporte: new Date().toISOString().slice(0, 10),
       estado: "REPORTADO" as EstadoPago,
-      comprobanteUrl: (fd.get("comprobanteUrl") as string) || undefined,
+      comprobantesAdjuntos: comprobantes,
       medioPago: (fd.get("medioPago") as string) || undefined,
       reportadoPorId: usuarioId,
       notas: (fd.get("notas") as string) || undefined,
@@ -113,6 +127,7 @@ export function PagosModule({
     startTransition(async () => {
       const created = await crearPagoAction(payload);
       if (created) setItems((prev) => [...prev, created]);
+      setComprobantes([]);
       setOpen(false);
     });
   }
@@ -317,9 +332,12 @@ export function PagosModule({
           <FormField label="Medio de pago (opcional)">
             <Input name="medioPago" placeholder="Transferencia, PSE, efectivo..." />
           </FormField>
-          <FormField label="Comprobante">
-            <SimulatedFileInput name="comprobanteUrl" label="Comprobante (simulado)" />
-          </FormField>
+          <MultiFileUploader
+            label="Comprobantes de pago"
+            value={comprobantes}
+            onChange={setComprobantes}
+            cargadoPor={cargadoPor}
+          />
           <FormField label="Notas">
             <Input name="notas" />
           </FormField>

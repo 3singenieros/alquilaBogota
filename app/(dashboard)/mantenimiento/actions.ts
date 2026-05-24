@@ -8,7 +8,13 @@ import {
   eliminarMantenimiento,
   listarInmueblesParaMantenimiento,
 } from "@/services/mantenimiento.service";
+import {
+  cerrarMantenimientoTicket,
+  definirResponsabilidadMantenimiento,
+  responderResponsabilidadCompartida,
+} from "@/services/mantenimiento-economico.service";
 import type {
+  ArchivoAdjunto,
   CreateInput,
   EstadoMantenimiento,
   Mantenimiento,
@@ -81,4 +87,39 @@ export async function eliminarMantenimientoAction(id: string) {
   await eliminarMantenimiento(id);
   revalidatePath("/mantenimiento");
   revalidatePath("/");
+}
+
+export async function definirResponsabilidadMantenimientoAction(
+  id: string,
+  input: Parameters<typeof definirResponsabilidadMantenimiento>[1]
+) {
+  const updated = await definirResponsabilidadMantenimiento(id, input);
+  revalidatePath("/mantenimiento");
+  revalidatePath("/");
+  return updated;
+}
+
+export async function responderResponsabilidadCompartidaAction(
+  id: string,
+  input: { aceptar: boolean; motivoRechazoResponsabilidad?: string }
+) {
+  const updated = await responderResponsabilidadCompartida(id, input);
+  revalidatePath("/mantenimiento");
+  revalidatePath("/");
+  return updated;
+}
+
+export async function cerrarMantenimientoTicketAction(
+  id: string,
+  input: {
+    valorFinal?: number;
+    fechaCierre: string;
+    observacionesCierre?: string;
+    documentosCierreAdjuntos?: ArchivoAdjunto[];
+  }
+) {
+  const updated = await cerrarMantenimientoTicket(id, input);
+  revalidatePath("/mantenimiento");
+  revalidatePath("/");
+  return updated;
 }

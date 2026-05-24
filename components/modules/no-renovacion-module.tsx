@@ -6,7 +6,9 @@ import {
   crearNoRenovacionAction,
   simularEnvioNotificacionNoRenovacionAction,
 } from "@/app/(dashboard)/no-renovacion/actions";
-import { SimulatedFileInput } from "@/components/shared/simulated-file-input";
+import { MultiFileUploader } from "@/components/shared/multi-file-uploader";
+import type { CargadoPorAdjunto } from "@/lib/archivos-adjuntos";
+import type { ArchivoAdjunto } from "@/types";
 import { FilterBar } from "@/components/shared/filter-bar";
 import { StatusBadge, estadoVariant } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -28,13 +30,24 @@ export function NoRenovacionModule({
   inmuebles,
   rol,
   usuarioId,
+  usuarioNombre,
+  usuarioEmail,
 }: {
   initialData: NoRenovacion[];
   contratos: Contrato[];
   inmuebles: Inmueble[];
   rol: Rol;
   usuarioId: string;
+  usuarioNombre: string;
+  usuarioEmail: string;
 }) {
+  const cargadoPor: CargadoPorAdjunto = {
+    id: usuarioId,
+    nombre: usuarioNombre,
+    email: usuarioEmail,
+    rol,
+  };
+  const [documentos, setDocumentos] = useState<ArchivoAdjunto[]>([]);
   const perms = getModulePermissions(rol, "no-renovacion");
   const [contratosOptions, setContratosOptions] = useState(contratos);
   const [inmueblesOptions, setInmueblesOptions] = useState(inmuebles);
@@ -81,7 +94,7 @@ export function NoRenovacionModule({
       fechaSolicitud: new Date().toISOString().slice(0, 10),
       estado: "SOLICITADA" as const,
       solicitadoPorId: usuarioId,
-      documentoUrl: (fd.get("documentoUrl") as string) || undefined,
+      documentosAdjuntos: documentos,
       fechaLimitePreaviso:
         (fd.get("fechaLimitePreaviso") as string) || contrato?.fechaLimitePreaviso || "",
       destinatarioArrendadorEmail:
@@ -94,6 +107,7 @@ export function NoRenovacionModule({
     startTransition(async () => {
       const created = await crearNoRenovacionAction(payload);
       if (created) setItems((prev) => [...prev, created]);
+      setDocumentos([]);
       setOpen(false);
     });
   }
@@ -243,9 +257,12 @@ export function NoRenovacionModule({
               />
             </FormField>
           </div>
-          <FormField label="Documento / evidencia">
-            <SimulatedFileInput name="documentoUrl" label="Carta o soporte (simulado)" />
-          </FormField>
+          <MultiFileUploader
+            label="Documentos de soporte"
+            value={documentos}
+            onChange={setDocumentos}
+            cargadoPor={cargadoPor}
+          />
           <FormField label="Observaciones notificación">
             <Input name="observacionesNotificacion" placeholder="Opcional" />
           </FormField>

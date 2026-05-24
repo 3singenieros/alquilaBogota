@@ -27,6 +27,8 @@ import {
 import { registrarNotificacion } from "@/services/notificaciones.service";
 import { listarInmueblesReferencia } from "@/services/inmuebles.service";
 import { crearNotificacionReajusteCanon } from "@/services/notificaciones.service";
+import { prepararDocumentosContrato } from "@/lib/archivos-adjuntos";
+import { traceAdjuntosAgregados } from "@/lib/audit/trace-adjuntos";
 import type { Contrato, CreateInput, EstadoContrato, UpdateInput } from "@/types";
 
 function generarTokenInvitacion(): string {
@@ -85,11 +87,14 @@ export async function crearContrato(data: CreateInput<Contrato>) {
     throw new BusinessRuleError("El email del arrendatario es obligatorio.");
   }
 
+  const docs = prepararDocumentosContrato(data.documentosAdjuntos, data.documentoUrl);
   const payload = buildContratoCreateInput({
     ...data,
     emailArrendatario,
     arrendatarioId: data.arrendatarioId || "",
     estado: "PENDIENTE_CONFIRMACION",
+    documentosAdjuntos: docs.documentosAdjuntos,
+    documentoUrl: docs.documentoUrl,
   });
 
   await assertUnSoloContratoActivoPorInmueble(
@@ -140,6 +145,16 @@ export async function crearContrato(data: CreateInput<Contrato>) {
     contexto: ctx,
     metadata: { emailInvitado: emailArrendatario },
   });
+
+  if (docs.documentosAdjuntos.length > 0) {
+    await traceAdjuntosAgregados(actor, {
+      entidadTipo: "CONTRATO",
+      entidadId: contrato.id,
+      adjuntos: docs.documentosAdjuntos,
+      descripcion: `Documentos del contrato ${contrato.code}`,
+      contexto: ctx,
+    });
+  }
 
   return contrato;
 }

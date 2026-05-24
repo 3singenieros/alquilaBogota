@@ -18,6 +18,8 @@ import {
   traceCambioEstado,
   traceEvento,
 } from "@/lib/audit/trace-helper";
+import { prepararComprobantes } from "@/lib/archivos-adjuntos";
+import { traceAdjuntosAgregados } from "@/lib/audit/trace-adjuntos";
 import { formatCurrency } from "@/lib/utils";
 
 async function assertPagoAccess(contratoId: string) {
@@ -74,10 +76,16 @@ export async function crearPago(data: CreateInput<PagoReportado>) {
     throw new AuthError("Solo el arrendatario puede reportar pagos", "FORBIDDEN");
   }
 
+  const { comprobantesAdjuntos, comprobanteUrl } = prepararComprobantes(
+    data.comprobantesAdjuntos,
+    data.comprobanteUrl
+  );
   const payload: CreateInput<PagoReportado> = {
     ...data,
     reportadoPorId: usuario.id,
     estado: "REPORTADO",
+    comprobantesAdjuntos,
+    comprobanteUrl,
   };
 
   const created = await getPagosRepository().create(payload);
@@ -106,6 +114,16 @@ export async function crearPago(data: CreateInput<PagoReportado>) {
     contexto: { ...ctx, pagoId: created.id },
     valoresNuevos: { monto: created.monto, mes: created.mes },
   });
+
+  if (comprobantesAdjuntos.length > 0) {
+    await traceAdjuntosAgregados(actor, {
+      entidadTipo: "PAGO",
+      entidadId: created.id,
+      adjuntos: comprobantesAdjuntos,
+      descripcion: `Comprobantes del pago ${created.code}`,
+      contexto: { ...ctx, pagoId: created.id },
+    });
+  }
 
   return created;
 }

@@ -1,5 +1,7 @@
 export type EstadoEnvioEmailSoporte = "PENDIENTE" | "SIMULADO" | "ERROR";
 
+import type { ArchivoAdjunto } from "@/types";
+
 export interface SoportePago {
   id: string;
   pagoId: string;
@@ -13,6 +15,7 @@ export interface SoportePago {
   medioPago?: string;
   observaciones?: string;
   estadoEnvioEmail: EstadoEnvioEmailSoporte;
+  documentosAdjuntos?: ArchivoAdjunto[];
 }
 
 export type SoportePdfData = {

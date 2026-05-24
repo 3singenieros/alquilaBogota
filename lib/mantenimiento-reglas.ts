@@ -14,6 +14,7 @@ export const CAMPOS_SOLICITUD_MANTENIMIENTO = [
   "descripcion",
   "prioridad",
   "adjuntoUrl",
+  "evidenciasAdjuntas",
 ] as const;
 
 export function arrendatarioPuedeEditarSolicitud(estado: EstadoMantenimiento): boolean {

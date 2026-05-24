@@ -1,3 +1,4 @@
+import { demoAdjuntoComprobanteServicio } from "@/data/mock/demo-adjuntos";
 import type { PagoServicioPublico } from "@/types";
 
 export const seedPagosServicio: PagoServicioPublico[] = [
@@ -31,6 +32,7 @@ export const seedPagosServicio: PagoServicioPublico[] = [
     valorPagado: 89900,
     estado: "REPORTADO",
     comprobanteUrl: "archivo:recibo-claro-mayo.pdf",
+    comprobantesAdjuntos: [demoAdjuntoComprobanteServicio],
     reportadoPorId: "u-arrendatario",
   },
   {

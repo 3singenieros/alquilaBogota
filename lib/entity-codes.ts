@@ -10,6 +10,7 @@ export const ENTITY_CODE_PREFIX = {
   servicioContrato: "sc",
   pagoServicio: "psv",
   comentarioMantenimiento: "cm",
+  archivoAdjunto: "adj",
   mantenimiento: "mnt",
   noRenovacion: "nr",
   soportePago: "sp",

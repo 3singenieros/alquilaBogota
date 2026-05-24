@@ -10,6 +10,7 @@ import {
 } from "@/lib/auth/scopes";
 import { auditActorFromUsuario, getAuditActor } from "@/lib/audit/actor";
 import { contextoDesdeInmueble } from "@/lib/audit/context";
+import { traceAdjuntosAgregados } from "@/lib/audit/trace-adjuntos";
 import {
   accionActualizacionMantenimiento,
   accionCambioEstadoMantenimiento,
@@ -18,6 +19,10 @@ import {
   traceEliminado,
   traceEvento,
 } from "@/lib/audit/trace-helper";
+import {
+  combinarAdjuntos,
+  prepararEvidenciasMantenimiento,
+} from "@/lib/archivos-adjuntos";
 import {
   arrendatarioPuedeEditarSolicitud,
   arrendadorPuedeGestionarEstado,
@@ -41,11 +46,11 @@ import type {
   UpdateInput,
 } from "@/types";
 
-async function contextoMantenimiento(inmuebleId: string) {
+export async function contextoMantenimiento(inmuebleId: string) {
   return contextoDesdeInmueble(inmuebleId);
 }
 
-async function assertAccesoMantenimiento(existing: Mantenimiento) {
+export async function assertAccesoMantenimiento(existing: Mantenimiento) {
   const { usuario } = await requireSession();
   const { inmuebles, contratos } = await loadAuthContext();
   const visible = filterMantenimiento(
@@ -82,7 +87,7 @@ async function assertInmuebleMantenimiento(inmuebleId: string) {
   }
 }
 
-async function resolverArrendador(inmuebleId: string) {
+export async function resolverArrendador(inmuebleId: string) {
   const inmueble = await getInmueblesRepository().findById(inmuebleId);
   if (!inmueble) return { nombre: "Arrendador", email: "" };
   const usuarios = await getUsuariosRepository().findAll();
@@ -90,7 +95,7 @@ async function resolverArrendador(inmuebleId: string) {
   return { nombre: u?.nombre ?? "Arrendador", email: u?.email ?? "" };
 }
 
-async function resolverArrendatario(solicitadoPorId: string, inmuebleId: string) {
+export async function resolverArrendatario(solicitadoPorId: string, inmuebleId: string) {
   const usuarios = await getUsuariosRepository().findAll();
   const u = usuarios.find((x) => x.id === solicitadoPorId);
   if (u) return { nombre: u.nombre, email: u.email };
@@ -115,7 +120,10 @@ function validarCamposSolicitud(
       (data.titulo !== undefined && data.titulo !== existing.titulo) ||
       (data.descripcion !== undefined && data.descripcion !== existing.descripcion) ||
       (data.prioridad !== undefined && data.prioridad !== existing.prioridad) ||
-      (data.adjuntoUrl !== undefined && data.adjuntoUrl !== existing.adjuntoUrl);
+      (data.adjuntoUrl !== undefined && data.adjuntoUrl !== existing.adjuntoUrl) ||
+      (data.evidenciasAdjuntas !== undefined &&
+        JSON.stringify(data.evidenciasAdjuntas) !==
+          JSON.stringify(existing.evidenciasAdjuntas));
     if (cambia) {
       throw new AuthError(MENSAJE_EDICION_BLOQUEADA, "FORBIDDEN");
     }
@@ -123,13 +131,21 @@ function validarCamposSolicitud(
 }
 
 function extraerSoloSolicitud(
-  data: UpdateInput<Mantenimiento>
+  data: UpdateInput<Mantenimiento>,
+  existing?: Mantenimiento
 ): UpdateInput<Mantenimiento> {
   const out: UpdateInput<Mantenimiento> = {};
   if (data.titulo !== undefined) out.titulo = data.titulo;
   if (data.descripcion !== undefined) out.descripcion = data.descripcion;
   if (data.prioridad !== undefined) out.prioridad = data.prioridad;
-  if (data.adjuntoUrl !== undefined) out.adjuntoUrl = data.adjuntoUrl;
+  if (data.evidenciasAdjuntas !== undefined || data.adjuntoUrl !== undefined) {
+    const prep = prepararEvidenciasMantenimiento(
+      data.evidenciasAdjuntas,
+      data.adjuntoUrl ?? existing?.adjuntoUrl
+    );
+    out.evidenciasAdjuntas = prep.evidenciasAdjuntas;
+    out.adjuntoUrl = prep.adjuntoUrl;
+  }
   return out;
 }
 
@@ -182,9 +198,15 @@ export async function crearMantenimiento(data: CreateInput<Mantenimiento>) {
   const rol = rolEfectivo(usuario);
   assertModuleAccess(rol, "mantenimiento");
   await assertInmuebleMantenimiento(data.inmuebleId);
+  const ev = prepararEvidenciasMantenimiento(data.evidenciasAdjuntas, data.adjuntoUrl);
   const payload: CreateInput<Mantenimiento> = {
     ...data,
     estado: "ABIERTO",
+    tipoResponsabilidad: data.tipoResponsabilidad ?? "POR_DEFINIR",
+    tipoMantenimiento: data.tipoMantenimiento ?? "CORRECTIVO",
+    aceptacionArrendatario: "NO_APLICA",
+    evidenciasAdjuntas: ev.evidenciasAdjuntas,
+    adjuntoUrl: ev.adjuntoUrl,
     solicitadoPorId:
       rol === "ARRENDATARIO" ? usuario.id : data.solicitadoPorId ?? usuario.id,
   };
@@ -199,6 +221,16 @@ export async function crearMantenimiento(data: CreateInput<Mantenimiento>) {
     ctx,
     "MANTENIMIENTO_CREADO"
   );
+  if (ev.evidenciasAdjuntas.length > 0) {
+    await traceAdjuntosAgregados(actor, {
+      entidadTipo: "MANTENIMIENTO",
+      entidadId: created.id,
+      adjuntos: ev.evidenciasAdjuntas,
+      accion: "MANTENIMIENTO_EVIDENCIA_ADJUNTADA",
+      descripcion: `Evidencias iniciales (${ev.evidenciasAdjuntas.length})`,
+      contexto: ctx,
+    });
+  }
   await notificarTicketCreado(created);
   return created;
 }
@@ -218,7 +250,7 @@ export async function actualizarContenidoMantenimiento(
     throw new AuthError("Solo puedes editar tus solicitudes", "FORBIDDEN");
   }
 
-  const soloSolicitud = extraerSoloSolicitud(data);
+  const soloSolicitud = extraerSoloSolicitud(data, existing);
   validarCamposSolicitud(rol, existing, soloSolicitud);
 
   if (rol === "ARRENDATARIO" && !arrendatarioPuedeEditarSolicitud(existing.estado)) {
@@ -282,13 +314,20 @@ export async function cambiarEstadoMantenimiento(
     throw new AuthError("El motivo de rechazo es obligatorio", "FORBIDDEN");
   }
 
+  if (input.estado === "CERRADO") {
+    throw new AuthError(
+      "Usa el formulario de cierre del ticket para cerrar con soporte documental",
+      "FORBIDDEN"
+    );
+  }
+
   const patch: UpdateInput<Mantenimiento> = {
     estado: input.estado,
     asignadoA: input.asignadoA?.trim() || existing.asignadoA,
     observacionesGestion:
       input.observacionesGestion?.trim() || existing.observacionesGestion,
   };
-  if (input.estado === "CERRADO" || input.estado === "RESUELTO") {
+  if (input.estado === "RESUELTO") {
     patch.fechaCierre = new Date().toISOString().slice(0, 10);
   }
 

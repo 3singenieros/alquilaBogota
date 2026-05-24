@@ -9,7 +9,10 @@ import {
   validarPagoServicioAction,
 } from "@/app/(dashboard)/servicios/actions";
 import { HistorialTimeline } from "@/components/trazabilidad/historial-timeline";
-import { SimulatedFileInput } from "@/components/shared/simulated-file-input";
+import { VerAdjuntosButton } from "@/components/shared/adjuntos-panel";
+import { MultiFileUploader } from "@/components/shared/multi-file-uploader";
+import type { CargadoPorAdjunto } from "@/lib/archivos-adjuntos";
+import type { ArchivoAdjunto } from "@/types";
 import { FilterBar } from "@/components/shared/filter-bar";
 import { StatusBadge, estadoVariant } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -53,12 +56,25 @@ export function ServiciosModule({
   pagos,
   contratos,
   rol,
+  usuarioId,
+  usuarioNombre,
+  usuarioEmail,
 }: {
   serviciosContrato: ServicioPublicoContrato[];
   pagos: PagoServicioPublico[];
   contratos: Contrato[];
   rol: Rol;
+  usuarioId: string;
+  usuarioNombre: string;
+  usuarioEmail: string;
 }) {
+  const cargadoPor: CargadoPorAdjunto = {
+    id: usuarioId,
+    nombre: usuarioNombre,
+    email: usuarioEmail,
+    rol,
+  };
+  const [comprobantesReporte, setComprobantesReporte] = useState<ArchivoAdjunto[]>([]);
   const canReview = rol === "ARRENDADOR" || rol === "ADMIN";
   const canReport = rol === "ARRENDATARIO" || rol === "ADMIN";
 
@@ -140,7 +156,7 @@ export function ServiciosModule({
         periodo: fd.get("periodo") as string,
         fechaPago: fd.get("fechaPago") as string,
         valorPagado: Number(fd.get("valorPagado")),
-        comprobanteUrl: (fd.get("comprobanteUrl") as string) || undefined,
+        comprobantesAdjuntos: comprobantesReporte,
         fechaVencimiento: (fd.get("fechaVencimiento") as string) || undefined,
         observaciones: (fd.get("observaciones") as string) || undefined,
       });
@@ -150,6 +166,7 @@ export function ServiciosModule({
           { ...created, servicio: servicioTarget },
         ]);
       }
+      setComprobantesReporte([]);
       setReportOpen(false);
       setServicioTarget(null);
     });
@@ -472,7 +489,12 @@ export function ServiciosModule({
               <Input name="fechaVencimiento" type="date" />
             </FormField>
             <FormField label="Comprobante">
-              <SimulatedFileInput name="comprobanteUrl" label="Recibo o comprobante (simulado)" />
+              <MultiFileUploader
+                label="Comprobantes del pago"
+                value={comprobantesReporte}
+                onChange={setComprobantesReporte}
+                cargadoPor={cargadoPor}
+              />
             </FormField>
             <FormField label="Observaciones">
               <Input name="observaciones" />

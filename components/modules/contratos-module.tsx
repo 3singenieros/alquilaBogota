@@ -10,7 +10,10 @@ import {
 import { listarHistorialContratoAction } from "@/app/(dashboard)/trazabilidad/actions";
 import { HistorialTimeline } from "@/components/trazabilidad/historial-timeline";
 import { FormSection } from "@/components/shared/form-section";
-import { SimulatedFileInput } from "@/components/shared/simulated-file-input";
+import { VerAdjuntosButton } from "@/components/shared/adjuntos-panel";
+import { MultiFileUploader } from "@/components/shared/multi-file-uploader";
+import type { CargadoPorAdjunto } from "@/lib/archivos-adjuntos";
+import type { ArchivoAdjunto } from "@/types";
 import { FilterBar } from "@/components/shared/filter-bar";
 import { StatusBadge, estadoVariant } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -59,13 +62,24 @@ export function ContratosModule({
   arrendatarios = [],
   rol,
   usuarioId,
+  usuarioNombre,
+  usuarioEmail,
 }: {
   initialData: Contrato[];
   inmuebles: Inmueble[];
   arrendatarios?: Usuario[];
   rol: Rol;
   usuarioId: string;
+  usuarioNombre: string;
+  usuarioEmail: string;
 }) {
+  const cargadoPor: CargadoPorAdjunto = {
+    id: usuarioId,
+    nombre: usuarioNombre,
+    email: usuarioEmail,
+    rol,
+  };
+  const [documentosContrato, setDocumentosContrato] = useState<ArchivoAdjunto[]>([]);
   const perms = getModulePermissions(rol, "contratos");
   const [inmueblesOptions, setInmueblesOptions] = useState(inmuebles);
   const inmueblesMap = useMemo(() => inmueblesById(inmueblesOptions), [inmueblesOptions]);
@@ -98,6 +112,7 @@ export function ContratosModule({
     setInmueblesOptions(fresh);
     setFormError(null);
     setEditing(editingItem);
+    setDocumentosContrato(editingItem?.documentosAdjuntos ?? []);
     setOpen(true);
   }
 
@@ -121,6 +136,7 @@ export function ContratosModule({
     const payload = {
       ...parseContratoFormData(fd),
       arrendadorId: usuarioId,
+      documentosAdjuntos: documentosContrato,
     };
     startTransition(async () => {
       setFormError(null);
@@ -510,13 +526,13 @@ export function ContratosModule({
                 <FormField label="Observaciones de entrega">
                   <Input name="observacionesEntrega" defaultValue={editing?.observacionesEntrega} />
                 </FormField>
-                <FormField label="Documento del contrato">
-                  <SimulatedFileInput
-                    name="documentoUrl"
-                    defaultValue={editing?.documentoUrl}
-                    label="Adjuntar contrato (simulado)"
-                  />
-                </FormField>
+                <MultiFileUploader
+                  label="Documentos del contrato (firmado, cédulas, inventario…)"
+                  value={documentosContrato}
+                  onChange={setDocumentosContrato}
+                  cargadoPor={cargadoPor}
+                  allowDescriptions
+                />
               </FormSection>
             </>
           )}

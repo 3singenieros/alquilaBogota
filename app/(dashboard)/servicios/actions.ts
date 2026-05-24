@@ -7,6 +7,7 @@ import {
   validarPagoServicio,
 } from "@/services/pagos-servicio.service";
 import { listarServiciosContrato } from "@/services/servicios-contrato.service";
+import type { ArchivoAdjunto } from "@/types";
 import { revalidatePath } from "next/cache";
 
 export async function listarServiciosContratoAction(contratoId?: string) {
@@ -19,6 +20,7 @@ export async function reportarPagoServicioAction(input: {
   fechaPago: string;
   valorPagado: number;
   comprobanteUrl?: string;
+  comprobantesAdjuntos?: ArchivoAdjunto[];
   fechaVencimiento?: string;
   observaciones?: string;
 }) {

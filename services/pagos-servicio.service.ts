@@ -23,7 +23,10 @@ import {
 import { assertModuleAccess, requireSession } from "@/services/auth.service";
 import { registrarNotificacion } from "@/services/notificaciones.service";
 import type { CreateInput, PagoServicioPublico } from "@/types";
+import { prepararComprobantes } from "@/lib/archivos-adjuntos";
+import { traceAdjuntosAgregados } from "@/lib/audit/trace-adjuntos";
 import { formatCurrency } from "@/lib/utils";
+import type { ArchivoAdjunto } from "@/types";
 
 function rolEfectivo(usuario: { rol: string; rolActivo?: string }) {
   return usuario.rolActivo ?? usuario.rol;
@@ -116,6 +119,7 @@ export async function reportarPagoServicio(input: {
   fechaPago: string;
   valorPagado: number;
   comprobanteUrl?: string;
+  comprobantesAdjuntos?: ArchivoAdjunto[];
   fechaVencimiento?: string;
   observaciones?: string;
 }) {
@@ -154,6 +158,10 @@ export async function reportarPagoServicio(input: {
   }
 
   const hoy = fechaHoy();
+  const { comprobantesAdjuntos, comprobanteUrl } = prepararComprobantes(
+    input.comprobantesAdjuntos,
+    input.comprobanteUrl
+  );
   const payload: CreateInput<PagoServicioPublico> = {
     servicioPublicoContratoId: servicio.id,
     contratoId: servicio.contratoId,
@@ -164,7 +172,8 @@ export async function reportarPagoServicio(input: {
     fechaVencimiento: input.fechaVencimiento?.trim() || finMesPeriodo(periodo),
     valorPagado: input.valorPagado,
     estado: "REPORTADO",
-    comprobanteUrl: input.comprobanteUrl,
+    comprobanteUrl,
+    comprobantesAdjuntos,
     reportadoPorId: usuario.id,
     observaciones: input.observaciones?.trim() || undefined,
   };
@@ -201,6 +210,16 @@ export async function reportarPagoServicio(input: {
     contexto: ctx,
     metadata: { servicioPublicoContratoId: servicio.id },
   });
+
+  if (comprobantesAdjuntos.length > 0) {
+    await traceAdjuntosAgregados(actor, {
+      entidadTipo: "PAGO_SERVICIO_PUBLICO",
+      entidadId: created.id,
+      adjuntos: comprobantesAdjuntos,
+      descripcion: `Comprobantes del pago de servicio ${created.code}`,
+      contexto: ctx,
+    });
+  }
 
   return created;
 }

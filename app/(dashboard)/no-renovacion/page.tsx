@@ -17,8 +17,10 @@ export default async function NoRenovacionPage() {
       initialData={items}
       contratos={contratos}
       inmuebles={inmuebles}
-      rol={session.usuario.rol}
+      rol={session.usuario.rolActivo ?? session.usuario.rol}
       usuarioId={session.usuario.id}
+      usuarioNombre={session.usuario.nombre}
+      usuarioEmail={session.usuario.email}
     />
   );
 }

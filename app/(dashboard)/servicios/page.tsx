@@ -17,6 +17,9 @@ export default async function ServiciosPage() {
       pagos={pagos}
       contratos={contratos}
       rol={session.usuario.rolActivo ?? session.usuario.rol}
+      usuarioId={session.usuario.id}
+      usuarioNombre={session.usuario.nombre}
+      usuarioEmail={session.usuario.email}
     />
   );
 }

@@ -36,6 +36,8 @@ export default async function PagosPage() {
       pdfPorPagoId={pdfPorPagoId}
       rol={session.usuario.rolActivo ?? session.usuario.rol}
       usuarioId={session.usuario.id}
+      usuarioNombre={session.usuario.nombre}
+      usuarioEmail={session.usuario.email}
     />
   );
 }
