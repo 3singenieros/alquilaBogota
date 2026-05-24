@@ -1,0 +1,10 @@
+export { supabaseUserRepository, supabaseProfileRepository, usuariosSupabaseRepository, profileSupabaseRepository } from "./supabase-user.repository";
+export { supabasePropertyRepository, inmueblesSupabaseRepository } from "./supabase-property.repository";
+export { supabaseContractRepository, supabaseInvitacionesContratoRepository, contratosSupabaseRepository, invitacionesContratoSupabaseRepository } from "./supabase-contract.repository";
+export { supabasePaymentRepository, supabaseSoportePagoRepository, pagosSupabaseRepository, soportePagoSupabaseRepository } from "./supabase-payment.repository";
+export { supabaseServicesRepository, supabasePagosServicioRepository, supabaseNotificacionesRepository, serviciosContratoSupabaseRepository, pagosServicioSupabaseRepository, notificacionesSupabaseRepository } from "./supabase-services.repository";
+export { supabaseMaintenanceRepository, supabaseComentariosMantenimientoRepository, mantenimientoSupabaseRepository, comentariosMantenimientoSupabaseRepository } from "./supabase-maintenance.repository";
+export { supabaseNonRenewalRepository, noRenovacionSupabaseRepository } from "./supabase-nonrenewal.repository";
+export { supabaseTrazabilidadRepository, trazabilidadSupabaseRepository } from "./supabase-trazabilidad.repository";
+export { supabaseFileRepository, getFileRepository } from "./supabase-file.repository";
+export { supabaseReportQueries, type ReporteFiltros, type SupabaseReportQueries } from "./supabase-report.repository";

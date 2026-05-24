@@ -8,9 +8,10 @@ MVP demostrable para tesis, preparado para Supabase sin sobreingeniería.
 |------|------------|
 | UI | Next.js App Router, React, Tailwind |
 | Estado sesión demo | Context + cookie/local (mock) |
-| Datos | Repositorios → Mock **o** Supabase |
-| Auth futuro | Supabase Auth |
-| Archivos | Supabase Storage (`comprobantes`, `contratos`, `mantenimiento`) |
+| Datos | Repositorios híbridos → Mock **o** Supabase (`config/app-mode.ts`) |
+| Auth | Firebase Auth (identidad) |
+| Persistencia | Supabase PostgreSQL (dominio) |
+| Archivos | Supabase Storage — ver `services/file-storage.service.ts` |
 
 ## Estructura de carpetas
 ```
@@ -18,10 +19,11 @@ app/(dashboard)/     → rutas protegidas por layout (sidebar + topbar)
 types/               → entidades y enums
 lib/                 → supabase client, cn(), config
 data/mock/           → datasets estáticos para desarrollo
-repositories/        → interfaces + mock + supabase
+repositories/        → interfaces + mock + supabase/ (repositorios reales)
 services/            → API interna de la app
 components/          → layout, ui, módulos
-supabase/            → schema.sql, seed.sql
+docs/database/       → schema SQL, seed, RLS, arquitectura persistencia
+config/              → app-mode (MOCK | SUPABASE)
 ```
 
 ## Flujo de datos
@@ -34,11 +36,13 @@ flowchart LR
   S --> ST[Supabase Storage]
 ```
 
-## Cambio mock → producción
-1. Crear proyecto Supabase y ejecutar `supabase/schema.sql`.
-2. Copiar `.env.example` → `.env.local` con URL y keys.
-3. `USE_MOCK_DATA=false` en entorno.
-4. Opcional: ejecutar `supabase/seed.sql` para datos demo.
+## Cambio mock → Supabase
+1. Crear proyecto Supabase y ejecutar `docs/database/supabase-schema.sql`.
+2. Opcional: `docs/database/supabase-seed.sql` para datos demo.
+3. Copiar `.env.example` → `.env.local` con URL y anon key.
+4. `NEXT_PUBLIC_APP_MODE=SUPABASE` (o `NEXT_PUBLIC_USE_MOCK_DATA=false`).
+
+Detalle en [docs/database/persistence-architecture.md](./database/persistence-architecture.md).
 
 ## Autenticación y roles
 

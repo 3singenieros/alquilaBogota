@@ -17,6 +17,11 @@ import { PageHeader } from "@/components/ui/page-header";
 import { Select } from "@/components/ui/select";
 import { Table, Td, Th, Tr } from "@/components/ui/table";
 import { formatCurrency } from "@/lib/utils";
+import {
+  CIUDAD_PROTOTIPO,
+  ESTRATOS_INMUEBLE,
+  LOCALIDADES_BOGOTA,
+} from "@/lib/inmueble-ubicacion";
 import { getModulePermissions } from "@/lib/auth/permissions";
 import type { EstadoInmueble, Inmueble, Rol } from "@/types";
 import type { EventoTrazabilidad } from "@/types/trazabilidad";
@@ -38,6 +43,7 @@ export function InmueblesModule({
   const [items, setItems] = useState(initialData);
   const [search, setSearch] = useState("");
   const [estadoFilter, setEstadoFilter] = useState("");
+  const [localidadFilter, setLocalidadFilter] = useState("");
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Inmueble | null>(null);
   const [pending, startTransition] = useTransition();
@@ -47,14 +53,18 @@ export function InmueblesModule({
 
   const filtered = useMemo(() => {
     return items.filter((i) => {
+      const q = search.toLowerCase();
       const matchSearch =
         !search ||
-        i.titulo.toLowerCase().includes(search.toLowerCase()) ||
-        i.ciudad.toLowerCase().includes(search.toLowerCase());
+        i.titulo.toLowerCase().includes(q) ||
+        (i.localidad?.toLowerCase().includes(q) ?? false) ||
+        (i.barrio?.toLowerCase().includes(q) ?? false) ||
+        i.direccion.toLowerCase().includes(q);
       const matchEstado = !estadoFilter || i.estado === estadoFilter;
-      return matchSearch && matchEstado;
+      const matchLocalidad = !localidadFilter || i.localidad === localidadFilter;
+      return matchSearch && matchEstado && matchLocalidad;
     });
-  }, [items, search, estadoFilter]);
+  }, [items, search, estadoFilter, localidadFilter]);
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -62,7 +72,10 @@ export function InmueblesModule({
     const payload = {
       titulo: fd.get("titulo") as string,
       direccion: fd.get("direccion") as string,
-      ciudad: fd.get("ciudad") as string,
+      ciudad: CIUDAD_PROTOTIPO,
+      localidad: (fd.get("localidad") as string) || undefined,
+      barrio: (fd.get("barrio") as string) || undefined,
+      estrato: fd.get("estrato") ? Number(fd.get("estrato")) : undefined,
       tipo: fd.get("tipo") as string,
       estado: fd.get("estado") as EstadoInmueble,
       canonMensual: Number(fd.get("canonMensual")),
@@ -99,7 +112,7 @@ export function InmueblesModule({
     <>
       <PageHeader
         title="Inmuebles"
-        description="Gestión de propiedades en arrendamiento activo"
+        description="Gestión de propiedades en arrendamiento activo — alcance Bogotá D.C."
         action={
           perms.canCreate ? (
             <Button
@@ -125,15 +138,32 @@ export function InmueblesModule({
         estado={estadoFilter}
         onEstadoChange={setEstadoFilter}
         estados={ESTADOS.map((e) => ({ value: e, label: e }))}
-        placeholder="Buscar por título o ciudad..."
+        placeholder="Buscar por título, localidad, barrio o dirección..."
       />
+      <div className="mb-4 max-w-xs">
+        <label className="mb-1 block text-xs font-medium text-slate-600">
+          Filtrar por localidad
+        </label>
+        <Select
+          value={localidadFilter}
+          onChange={(e) => setLocalidadFilter(e.target.value)}
+        >
+          <option value="">Todas las localidades</option>
+          {LOCALIDADES_BOGOTA.map((loc) => (
+            <option key={loc} value={loc}>
+              {loc}
+            </option>
+          ))}
+        </Select>
+      </div>
 
       <Table>
         <thead>
           <tr>
             <Th>Código</Th>
             <Th>Título</Th>
-            <Th>Ciudad</Th>
+            <Th>Localidad</Th>
+            <Th>Barrio</Th>
             <Th>Tipo</Th>
             <Th>Canon</Th>
             <Th>Estado</Th>
@@ -145,7 +175,8 @@ export function InmueblesModule({
             <Tr key={i.id}>
               <Td className="font-mono text-xs text-slate-600">{i.code}</Td>
               <Td className="font-medium text-slate-900">{i.titulo}</Td>
-              <Td>{i.ciudad}</Td>
+              <Td>{i.localidad ?? "—"}</Td>
+              <Td>{i.barrio ?? "—"}</Td>
               <Td>{i.tipo}</Td>
               <Td>{formatCurrency(i.canonMensual)}</Td>
               <Td>
@@ -232,9 +263,38 @@ export function InmueblesModule({
           <FormField label="Dirección">
             <Input name="direccion" defaultValue={editing?.direccion} required />
           </FormField>
+          <FormField label="Ciudad">
+            <Input name="ciudad" value={CIUDAD_PROTOTIPO} readOnly disabled />
+            <p className="mt-1 text-xs text-slate-500">
+              Actualmente el prototipo está delimitado para Bogotá D.C. La estructura queda
+              preparada para futuras expansiones a otras ciudades.
+            </p>
+          </FormField>
           <div className="grid grid-cols-2 gap-3">
-            <FormField label="Ciudad">
-              <Input name="ciudad" defaultValue={editing?.ciudad} required />
+            <FormField label="Localidad">
+              <Select name="localidad" defaultValue={editing?.localidad ?? ""}>
+                <option value="">Seleccionar localidad</option>
+                {LOCALIDADES_BOGOTA.map((loc) => (
+                  <option key={loc} value={loc}>
+                    {loc}
+                  </option>
+                ))}
+              </Select>
+            </FormField>
+            <FormField label="Barrio">
+              <Input name="barrio" defaultValue={editing?.barrio ?? ""} placeholder="Opcional" />
+            </FormField>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <FormField label="Estrato">
+              <Select name="estrato" defaultValue={editing?.estrato?.toString() ?? ""}>
+                <option value="">Sin especificar</option>
+                {ESTRATOS_INMUEBLE.map((e) => (
+                  <option key={e} value={e}>
+                    {e}
+                  </option>
+                ))}
+              </Select>
             </FormField>
             <FormField label="Tipo">
               <Input name="tipo" defaultValue={editing?.tipo ?? "Apartamento"} required />

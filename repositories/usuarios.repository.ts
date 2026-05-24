@@ -1,7 +1,6 @@
 import { seedUsuarios } from "@/data/mock/seed";
-import { ENTITY_CODE_PREFIX, generateUniqueCode } from "@/lib/entity-codes";
+import { ENTITY_CODE_PREFIX } from "@/lib/entity-codes";
 import { buildMockEntity } from "@/lib/mock-create";
-import { getSupabaseClient } from "@/lib/supabase/client";
 import { createMockStore } from "@/repositories/mock-store";
 import type { CreateInput, UpdateInput, Usuario } from "@/types";
 
@@ -33,81 +32,4 @@ export const usuariosMockRepository: UsuariosRepository = {
   delete: async (id) => mockStore.remove(id),
 };
 
-export const usuariosSupabaseRepository: UsuariosRepository = {
-  findAll: async () => {
-    const sb = getSupabaseClient();
-    if (!sb) return [];
-    const { data, error } = await sb.from("usuarios").select("*");
-    if (error) throw error;
-    return (data ?? []).map(mapRow);
-  },
-  findById: async (id) => {
-    const sb = getSupabaseClient();
-    if (!sb) return null;
-    const { data } = await sb.from("usuarios").select("*").eq("id", id).single();
-    return data ? mapRow(data) : null;
-  },
-  create: async (input) => {
-    const sb = getSupabaseClient();
-    if (!sb) throw new Error("Supabase no configurado");
-    const { data: existing } = await sb.from("usuarios").select("code");
-    const code = generateUniqueCode(
-      ENTITY_CODE_PREFIX.usuario,
-      (existing ?? []).map((r) => r.code as string)
-    );
-    const { data, error } = await sb
-      .from("usuarios")
-      .insert({ ...toRow(input), code })
-      .select()
-      .single();
-    if (error) throw error;
-    return mapRow(data);
-  },
-  update: async (id, input) => {
-    const sb = getSupabaseClient();
-    if (!sb) return null;
-    const { data } = await sb.from("usuarios").update(toRow(input)).eq("id", id).select().single();
-    return data ? mapRow(data) : null;
-  },
-  delete: async (id) => {
-    const sb = getSupabaseClient();
-    if (!sb) return false;
-    const { error } = await sb.from("usuarios").delete().eq("id", id);
-    return !error;
-  },
-};
-
-function mapRow(r: Record<string, unknown>): Usuario {
-  const rol = r.rol as Usuario["rol"];
-  const roles = (r.roles as Usuario["roles"] | undefined) ?? [rol];
-  const rolActivo = (r.rol_activo as Usuario["rolActivo"] | undefined) ?? rol;
-  return {
-    id: r.id as string,
-    code: r.code as string,
-    nombre: r.nombre as string,
-    email: r.email as string,
-    rol: rolActivo,
-    roles,
-    rolActivo,
-    telefono: r.telefono as string | undefined,
-    activo: Boolean(r.activo),
-    creadoEn: r.creado_en as string,
-    perfilCompletado: Boolean(r.perfil_completado ?? true),
-    firebaseUid: r.firebase_uid as string | undefined,
-  };
-}
-
-function toRow(i: Partial<Usuario>) {
-  return {
-    nombre: i.nombre,
-    email: i.email,
-    rol: i.rol,
-    roles: i.roles,
-    rol_activo: i.rolActivo,
-    telefono: i.telefono,
-    activo: i.activo,
-    creado_en: i.creadoEn,
-    perfil_completado: i.perfilCompletado,
-    firebase_uid: i.firebaseUid,
-  };
-}
+export { usuariosSupabaseRepository } from "@/repositories/supabase/supabase-user.repository";

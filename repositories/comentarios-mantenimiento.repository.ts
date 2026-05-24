@@ -13,29 +13,21 @@ export interface ComentariosMantenimientoRepository {
 
 const store = [...seedComentariosMantenimiento];
 
-export const comentariosMantenimientoMockRepository: ComentariosMantenimientoRepository =
-  {
-    findAll: async () => [...store],
-    findByMantenimientoId: async (mantenimientoId) =>
-      store
-        .filter((c) => c.mantenimientoId === mantenimientoId)
-        .sort((a, b) => a.fechaCreacion.localeCompare(b.fechaCreacion)),
-    create: async (data) => {
-      const item: ComentarioMantenimiento = {
-        id: newId(ENTITY_CODE_PREFIX.comentarioMantenimiento),
-        fechaCreacion: new Date().toISOString(),
-        ...data,
-      };
-      store.push(item);
-      return item;
-    },
-  };
+export const comentariosMantenimientoMockRepository: ComentariosMantenimientoRepository = {
+  findAll: async () => [...store],
+  findByMantenimientoId: async (mantenimientoId) =>
+    store
+      .filter((c) => c.mantenimientoId === mantenimientoId)
+      .sort((a, b) => a.fechaCreacion.localeCompare(b.fechaCreacion)),
+  create: async (data) => {
+    const item: ComentarioMantenimiento = {
+      id: newId(ENTITY_CODE_PREFIX.comentarioMantenimiento),
+      fechaCreacion: new Date().toISOString(),
+      ...data,
+    };
+    store.push(item);
+    return item;
+  },
+};
 
-export const comentariosMantenimientoSupabaseRepository: ComentariosMantenimientoRepository =
-  {
-    findAll: async () => [],
-    findByMantenimientoId: async () => [],
-    create: async (data) => {
-      throw new Error("Supabase no configurado para comentarios de mantenimiento");
-    },
-  };
+export { comentariosMantenimientoSupabaseRepository } from "@/repositories/supabase/supabase-maintenance.repository";

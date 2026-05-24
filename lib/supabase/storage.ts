@@ -1,8 +1,9 @@
-import { STORAGE_BUCKETS } from "@/lib/config";
+import { STORAGE_BUCKETS, type StorageBucketKey } from "@/lib/config";
 import { getSupabaseClient } from "@/lib/supabase/client";
 
-export type StorageBucket = keyof typeof STORAGE_BUCKETS;
+export type StorageBucket = StorageBucketKey;
 
+/** @deprecated Usar services/file-storage.service.ts */
 export async function uploadFile(
   bucket: StorageBucket,
   path: string,

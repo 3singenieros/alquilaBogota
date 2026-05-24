@@ -1,5 +1,5 @@
 import { seedServiciosContrato } from "@/data/mock/seed-servicios-contrato";
-import { ENTITY_CODE_PREFIX, generateUniqueCode } from "@/lib/entity-codes";
+import { ENTITY_CODE_PREFIX } from "@/lib/entity-codes";
 import { buildMockEntity } from "@/lib/mock-create";
 import { createMockStore } from "@/repositories/mock-store";
 import type { CreateInput, ServicioPublicoContrato, UpdateInput } from "@/types";
@@ -35,13 +35,4 @@ export const serviciosContratoMockRepository: ServiciosContratoRepository = {
   delete: async (id) => mockStore.remove(id),
 };
 
-export const serviciosContratoSupabaseRepository: ServiciosContratoRepository = {
-  findAll: async () => [],
-  findById: async () => null,
-  findByContratoId: async () => [],
-  create: async (input) => {
-    throw new Error("Supabase no configurado para servicios de contrato");
-  },
-  update: async () => null,
-  delete: async () => false,
-};
+export { serviciosContratoSupabaseRepository } from "@/repositories/supabase/supabase-services.repository";

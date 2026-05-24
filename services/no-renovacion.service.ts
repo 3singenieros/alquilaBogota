@@ -1,4 +1,8 @@
 import { AuthError } from "@/lib/auth/errors";
+import {
+  formatInmuebleDireccionCompleta,
+  formatInmuebleUbicacion,
+} from "@/lib/inmueble-ubicacion";
 import { loadAuthContext } from "@/lib/auth/load-context";
 import { assertModuleAccess, requireSession } from "@/services/auth.service";
 import { canAccessContrato, filterContratos, filterNoRenovacion } from "@/lib/auth/scopes";
@@ -339,8 +343,8 @@ export async function obtenerDatosPdfNoRenovacion(id: string): Promise<NoRenovac
   }
   return {
     expediente,
-    ciudad: inmueble.ciudad,
-    inmuebleDireccion: `${inmueble.direccion}, ${inmueble.ciudad}`,
+    ciudad: formatInmuebleUbicacion(inmueble),
+    inmuebleDireccion: formatInmuebleDireccionCompleta(inmueble),
     codigoContrato: contrato.code,
   };
 }

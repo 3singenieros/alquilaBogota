@@ -1,7 +1,11 @@
 import type { Contrato, Inmueble, Usuario } from "@/types";
+import { formatInmuebleUbicacion } from "@/lib/inmueble-ubicacion";
 
 export function inmuebleOptionLabel(inmueble: Inmueble): string {
-  return `${inmueble.code} — ${inmueble.titulo}`;
+  const ubicacion = inmueble.localidad
+    ? ` — ${formatInmuebleUbicacion(inmueble)}`
+    : "";
+  return `${inmueble.code} — ${inmueble.titulo}${ubicacion}`;
 }
 
 export function inmueblesById(inmuebles: Inmueble[]): Map<string, Inmueble> {

@@ -1,5 +1,5 @@
 import { seedPagosServicio } from "@/data/mock/seed-pagos-servicio";
-import { ENTITY_CODE_PREFIX, generateUniqueCode } from "@/lib/entity-codes";
+import { ENTITY_CODE_PREFIX } from "@/lib/entity-codes";
 import { buildMockEntity } from "@/lib/mock-create";
 import { createMockStore } from "@/repositories/mock-store";
 import type { CreateInput, PagoServicioPublico, UpdateInput } from "@/types";
@@ -32,13 +32,4 @@ export const pagosServicioMockRepository: PagosServicioRepository = {
   delete: async (id) => mockStore.remove(id),
 };
 
-export const pagosServicioSupabaseRepository: PagosServicioRepository = {
-  findAll: async () => [],
-  findById: async () => null,
-  findByServicioContratoId: async () => [],
-  create: async () => {
-    throw new Error("Supabase no configurado para pagos de servicio");
-  },
-  update: async () => null,
-  delete: async () => false,
-};
+export { pagosServicioSupabaseRepository } from "@/repositories/supabase/supabase-services.repository";

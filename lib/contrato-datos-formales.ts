@@ -1,3 +1,4 @@
+import { formatInmuebleDireccionCompleta } from "@/lib/inmueble-ubicacion";
 import type { Contrato, Inmueble, Rol, Usuario } from "@/types";
 
 export type DatosParteFormal = {
@@ -46,7 +47,7 @@ export function datosFormalesDesdeContrato(
       contrato.correoNotificacionesArrendador ?? arrendador?.email ?? "",
     direccionNotificaciones:
       contrato.direccionNotificacionesArrendador ??
-      (inmueble ? `${inmueble.direccion}, ${inmueble.ciudad}` : ""),
+      (inmueble ? formatInmuebleDireccionCompleta(inmueble) : ""),
   };
 
   const arrendatarioDatos: DatosParteFormal = {

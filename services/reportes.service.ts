@@ -18,6 +18,7 @@ import {
   filtrosAplicadosLabels,
 } from "@/lib/reportes/filtros-eventos";
 import { formatCurrency, formatDate } from "@/lib/utils";
+import { formatInmuebleDireccionCompleta, formatInmuebleUbicacion } from "@/lib/inmueble-ubicacion";
 import {
   getContratosRepository,
   getInmueblesRepository,
@@ -155,7 +156,9 @@ export async function obtenerReporteHistorialContrato(
       filas: [
         { etiqueta: "Código", valor: contrato.code },
         { etiqueta: "Inmueble", valor: inmueble?.titulo ?? contrato.inmuebleId },
-        { etiqueta: "Dirección", valor: inmueble ? `${inmueble.direccion}, ${inmueble.ciudad}` : "—" },
+        { etiqueta: "Dirección", valor: inmueble ? formatInmuebleDireccionCompleta(inmueble) : "—" },
+        { etiqueta: "Localidad", valor: inmueble?.localidad ?? "—" },
+        { etiqueta: "Ciudad", valor: inmueble?.ciudad ?? "—" },
         { etiqueta: "Arrendador", valor: contrato.nombreArrendador ?? "—" },
         {
           etiqueta: "Documento arrendador",
@@ -364,7 +367,11 @@ export async function obtenerReporteHistorialInmueble(
         titulo: "Datos del inmueble",
         filas: [
           { etiqueta: "Título", valor: inmueble.titulo },
-          { etiqueta: "Dirección", valor: `${inmueble.direccion}, ${inmueble.ciudad}` },
+          { etiqueta: "Dirección", valor: formatInmuebleDireccionCompleta(inmueble) },
+          { etiqueta: "Localidad", valor: inmueble.localidad ?? "—" },
+          { etiqueta: "Barrio", valor: inmueble.barrio ?? "—" },
+          { etiqueta: "Ciudad", valor: inmueble.ciudad },
+          { etiqueta: "Ubicación", valor: formatInmuebleUbicacion(inmueble) },
           { etiqueta: "Arrendador", valor: arrendador?.nombre ?? inmueble.arrendadorId },
           { etiqueta: "Estado", valor: inmueble.estado },
         ],

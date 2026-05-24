@@ -1,18 +1,69 @@
 import { AuthError } from "@/lib/auth/errors";
-import { loadAuthContext } from "@/lib/auth/load-context";
+import {
+  traceActualizacion,
+  traceCreado,
+  traceEliminado,
+  traceEvento,
+} from "@/lib/audit/trace-helper";
+import { auditActorFromUsuario, getAuditActor } from "@/lib/audit/actor";
 import { assertModuleAccess, requireSession } from "@/services/auth.service";
 import {
   canAccessInmueble,
   filterInmuebles,
 } from "@/lib/auth/scopes";
-import { auditActorFromUsuario, getAuditActor } from "@/lib/audit/actor";
 import {
-  traceActualizacion,
-  traceCreado,
-  traceEliminado,
-} from "@/lib/audit/trace-helper";
+  CIUDAD_PROTOTIPO,
+  isLocalidadBogota,
+  normalizeCiudadPrototipo,
+} from "@/lib/inmueble-ubicacion";
 import { getInmueblesRepository } from "@/repositories";
 import type { CreateInput, Inmueble, UpdateInput } from "@/types";
+
+const CAMPOS_UBICACION: (keyof Inmueble)[] = [
+  "direccion",
+  "localidad",
+  "barrio",
+  "estrato",
+  "ciudad",
+];
+
+function normalizeInmuebleInput<T extends CreateInput<Inmueble> | UpdateInput<Inmueble>>(
+  data: T
+): T {
+  const estratoRaw = data.estrato;
+  const estrato =
+    estratoRaw === undefined || estratoRaw === null || estratoRaw === ("" as unknown as number)
+      ? undefined
+      : Number(estratoRaw);
+
+  return {
+    ...data,
+    ciudad: normalizeCiudadPrototipo(data.ciudad),
+    localidad: data.localidad?.trim() || undefined,
+    barrio: data.barrio?.trim() || undefined,
+    estrato: estrato && estrato >= 1 && estrato <= 6 ? estrato : undefined,
+  };
+}
+
+function assertLocalidadValida(localidad?: string) {
+  if (localidad && !isLocalidadBogota(localidad)) {
+    throw new AuthError("Localidad no válida para Bogotá D.C.", "FORBIDDEN");
+  }
+}
+
+function diffUbicacion(antes: Inmueble, despues: Inmueble) {
+  const valoresAnteriores: Record<string, unknown> = {};
+  const valoresNuevos: Record<string, unknown> = {};
+  let changed = false;
+  for (const key of CAMPOS_UBICACION) {
+    if (antes[key] !== despues[key]) {
+      valoresAnteriores[key as string] = antes[key];
+      valoresNuevos[key as string] = despues[key];
+      changed = true;
+    }
+  }
+  return changed ? { valoresAnteriores, valoresNuevos } : null;
+}
 
 export async function listarInmuebles() {
   const { usuario } = await requireSession();
@@ -44,13 +95,15 @@ export async function crearInmueble(data: CreateInput<Inmueble>) {
   if (usuario.rol !== "ADMIN" && usuario.rol !== "ARRENDADOR") {
     throw new AuthError("No puedes crear inmuebles", "FORBIDDEN");
   }
-  const created = await getInmueblesRepository().create(data);
+  const payload = normalizeInmuebleInput(data);
+  assertLocalidadValida(payload.localidad);
+  const created = await getInmueblesRepository().create(payload);
   const actor = auditActorFromUsuario(usuario);
   await traceCreado(
     actor,
     "INMUEBLE",
     created.id,
-    `Inmueble ${created.code} creado (${created.titulo})`,
+    `Inmueble ${created.code} creado (${created.titulo}) — ${created.localidad ?? CIUDAD_PROTOTIPO}`,
     { inmuebleId: created.id }
   );
   return created;
@@ -66,7 +119,9 @@ export async function actualizarInmueble(id: string, data: UpdateInput<Inmueble>
   if (usuario.rol === "ARRENDADOR") {
     data = { ...data, arrendadorId: usuario.id };
   }
-  const updated = await getInmueblesRepository().update(id, data);
+  const payload = normalizeInmuebleInput(data);
+  assertLocalidadValida(payload.localidad);
+  const updated = await getInmueblesRepository().update(id, payload);
   if (updated) {
     const actor = auditActorFromUsuario(usuario);
     await traceActualizacion(actor, "INMUEBLE", id, existing, updated, {
@@ -74,8 +129,20 @@ export async function actualizarInmueble(id: string, data: UpdateInput<Inmueble>
       estadoField: "estado",
       accionPorEstado: () => undefined,
       contexto: { inmuebleId: id },
-      camposExtra: ["titulo", "direccion", "canonMensual", "estado"],
+      camposExtra: ["titulo", "canonMensual", "estado", "tipo", "descripcion"],
     });
+    const diff = diffUbicacion(existing, updated);
+    if (diff) {
+      await traceEvento(actor, {
+        entidadTipo: "INMUEBLE",
+        entidadId: id,
+        accion: "INMUEBLE_ACTUALIZADO",
+        descripcion: `Ubicación del inmueble ${updated.code} actualizada`,
+        valoresAnteriores: diff.valoresAnteriores,
+        valoresNuevos: diff.valoresNuevos,
+        contexto: { inmuebleId: id },
+      });
+    }
     if (existing.estado !== updated.estado && updated.estado === "MANTENIMIENTO") {
       await traceActualizacion(actor, "INMUEBLE", id, existing, updated, {
         descripcion: `Inmueble ${updated.code} marcado en mantenimiento/inactivo`,

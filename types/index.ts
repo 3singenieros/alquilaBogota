@@ -83,7 +83,18 @@ export interface ArchivoAdjunto {
   nombre: string;
   tipo?: string;
   tamano?: number;
+  /** URL simulada para modo mock (sin Storage). */
   urlSimulada?: string;
+  /** Bucket de Supabase Storage cuando la persistencia real está activa. */
+  bucket?: string;
+  /** Ruta dentro del bucket (ej. contratos/ctr-1/contrato.pdf). */
+  path?: string;
+  /** URL pública o firmada del archivo en Storage. */
+  publicUrl?: string;
+  /** ISO timestamp de carga en Storage. */
+  uploadedAt?: string;
+  /** ID del usuario que subió el archivo. */
+  uploadedBy?: string;
   descripcion?: string;
   fechaCarga: string;
   cargadoPorId?: string;
@@ -138,7 +149,11 @@ export interface Inmueble {
   code: string;
   titulo: string;
   direccion: string;
+  /** Conservado para expansión multi-ciudad; en el prototipo siempre Bogotá D.C. */
   ciudad: string;
+  localidad?: string;
+  barrio?: string;
+  estrato?: number;
   tipo: string;
   estado: EstadoInmueble;
   canonMensual: number;

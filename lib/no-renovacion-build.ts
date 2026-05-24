@@ -1,4 +1,5 @@
 import type { DatosFormalesContrato, DatosParteFormal } from "@/lib/contrato-datos-formales";
+import { formatInmuebleDireccionCompleta, formatInmuebleUbicacion } from "@/lib/inmueble-ubicacion";
 import { generarTextoNoRenovacion } from "@/lib/no-renovacion-texto";
 import type { Contrato, Inmueble, NoRenovacion, Rol, Usuario } from "@/types";
 
@@ -71,7 +72,7 @@ export function textoComunicacionDesdeExpediente(
   inmueble: Inmueble
 ): string {
   return generarTextoNoRenovacion({
-    ciudad: inmueble.ciudad,
+    ciudad: formatInmuebleUbicacion(inmueble),
     fechaCarta: new Date().toISOString().slice(0, 10),
     remitenteNombre: expediente.remitenteNombre,
     remitenteTipoDocumento: expediente.remitenteTipoDocumento,
@@ -84,7 +85,7 @@ export function textoComunicacionDesdeExpediente(
     destinatarioEmail: expediente.destinatarioEmail,
     destinatarioDireccion: expediente.destinatarioDireccionNotificacion,
     codigoContrato: contrato.code,
-    inmuebleDireccion: `${inmueble.direccion}, ${inmueble.ciudad}`,
+    inmuebleDireccion: formatInmuebleDireccionCompleta(inmueble),
     fechaInicio: contrato.fechaInicio,
     fechaFin: contrato.fechaFin,
     fechaLimitePreaviso: expediente.fechaLimitePreaviso,

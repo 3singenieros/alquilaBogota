@@ -62,7 +62,8 @@ export type AccionTrazabilidad =
   | "ROL_AGREGADO"
   | "REPORTE_GENERADO"
   | "ACCESO_DENEGADO"
-  | "PERFIL_ACTUALIZADO";
+  | "PERFIL_ACTUALIZADO"
+  | "INMUEBLE_ACTUALIZADO";
 
 export type RolAuditoria = Rol | "SISTEMA";
 

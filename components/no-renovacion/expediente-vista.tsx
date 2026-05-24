@@ -2,6 +2,7 @@
 
 import { HistorialTimeline } from "@/components/shared/historial-timeline";
 import { StatusBadge, estadoVariant } from "@/components/ui/badge";
+import { formatInmuebleDireccionCompleta } from "@/lib/inmueble-ubicacion";
 import { formatDate } from "@/lib/utils";
 import type { Contrato, Inmueble, NoRenovacion } from "@/types";
 import type { EventoTrazabilidad } from "@/types/trazabilidad";
@@ -28,8 +29,11 @@ export function ExpedienteVista({
           <span className="text-slate-500">Inmueble</span>
           <p>{inmueble.titulo}</p>
           <p className="text-xs text-slate-500">
-            {inmueble.direccion}, {inmueble.ciudad}
+            {formatInmuebleDireccionCompleta(inmueble)}
           </p>
+          {inmueble.localidad ? (
+            <p className="text-xs text-slate-400">Localidad: {inmueble.localidad}</p>
+          ) : null}
         </div>
         <div>
           <span className="text-slate-500">Iniciado por</span>

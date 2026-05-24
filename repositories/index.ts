@@ -1,4 +1,4 @@
-import { USE_MOCK_DATA } from "@/lib/config";
+import { isMockMode } from "@/config/app-mode";
 import {
   contratosMockRepository,
   contratosSupabaseRepository,
@@ -71,7 +71,7 @@ import {
 } from "@/repositories/trazabilidad.repository";
 
 function pick<T>(mock: T, supabase: T): T {
-  return USE_MOCK_DATA ? mock : supabase;
+  return isMockMode() ? mock : supabase;
 }
 
 export function getInmueblesRepository(): InmueblesRepository {
@@ -132,3 +132,5 @@ export function getSoportePagoRepository(): SoportePagoRepository {
 export function getTrazabilidadRepository(): TrazabilidadRepository {
   return pick(trazabilidadMockRepository, trazabilidadSupabaseRepository);
 }
+
+export { getFileRepository, supabaseReportQueries } from "@/repositories/supabase";
