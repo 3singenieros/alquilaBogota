@@ -1,5 +1,6 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-import { isMockMode } from "@/config/app-mode";
+import { hasSupabaseEnv, isMockMode } from "@/config/app-mode";
+import { getNormalizedSupabaseUrl, getSupabaseAnonKey } from "@/lib/supabase/env";
 import type { Database } from "@/lib/supabase/types";
 
 /**
@@ -7,9 +8,9 @@ import type { Database } from "@/lib/supabase/types";
  * Usa la anon key; las reglas RLS aplicarán cuando estén activas.
  */
 export function createSupabaseServerClient(): SupabaseClient<Database> | null {
-  if (isMockMode()) return null;
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  if (isMockMode() || !hasSupabaseEnv()) return null;
+  const url = getNormalizedSupabaseUrl();
+  const key = getSupabaseAnonKey();
   if (!url || !key) return null;
   return createClient<Database>(url, key, {
     auth: { persistSession: false, autoRefreshToken: false },
@@ -17,10 +18,14 @@ export function createSupabaseServerClient(): SupabaseClient<Database> | null {
 }
 
 let serverClient: SupabaseClient<Database> | null | undefined;
+let serverClientUrl: string | null | undefined;
 
 export function getSupabaseServerClient(): SupabaseClient<Database> | null {
-  if (serverClient === undefined) {
-    serverClient = createSupabaseServerClient();
+  const url = getNormalizedSupabaseUrl();
+  if (serverClient !== undefined && serverClientUrl === url) {
+    return serverClient;
   }
+  serverClient = createSupabaseServerClient();
+  serverClientUrl = url;
   return serverClient;
 }

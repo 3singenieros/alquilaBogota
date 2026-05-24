@@ -1,8 +1,8 @@
 /**
  * Repositorios Supabase — servicios públicos, pagos de servicio y notificaciones.
- * Fase 2 de migración: stubs tipados listos para implementación CRUD completa.
  */
-import { requireSupabase } from "@/lib/supabase/helpers";
+import { ENTITY_CODE_PREFIX, generateUniqueCode } from "@/lib/entity-codes";
+import { extractEntityCodes, nullableFkId, requireSupabase } from "@/lib/supabase/helpers";
 import type { ServiciosContratoRepository } from "@/repositories/servicios-contrato.repository";
 import type { PagosServicioRepository } from "@/repositories/pagos-servicio.repository";
 import type { NotificacionesRepository } from "@/repositories/notificaciones.repository";
@@ -14,14 +14,82 @@ import type {
   UpdateInput,
 } from "@/types";
 
-const NOT_READY = "Supabase: módulo servicios/notificaciones — migración fase 2 pendiente";
+function mapServicioRow(r: Record<string, unknown>): ServicioPublicoContrato {
+  return {
+    id: r.id as string,
+    code: r.code as string,
+    contratoId: r.contrato_id as string,
+    inmuebleId: r.inmueble_id as string,
+    tipoServicio: r.tipo_servicio as ServicioPublicoContrato["tipoServicio"],
+    empresaPrestadora: r.empresa_prestadora as string,
+    numeroCuentaServicio: r.numero_cuenta_servicio as string,
+    periodicidad: r.periodicidad as ServicioPublicoContrato["periodicidad"],
+    activo: Boolean(r.activo),
+    observaciones: r.observaciones as string | undefined,
+  };
+}
+
+function toServicioRow(i: Partial<ServicioPublicoContrato>) {
+  return {
+    contrato_id: i.contratoId,
+    inmueble_id: i.inmuebleId,
+    tipo_servicio: i.tipoServicio,
+    empresa_prestadora: i.empresaPrestadora,
+    numero_cuenta_servicio: i.numeroCuentaServicio,
+    periodicidad: i.periodicidad,
+    activo: i.activo,
+    observaciones: i.observaciones,
+  };
+}
+
+function mapPagoServicioRow(r: Record<string, unknown>): PagoServicioPublico {
+  return {
+    id: r.id as string,
+    code: r.code as string,
+    servicioPublicoContratoId: r.servicio_publico_contrato_id as string,
+    contratoId: r.contrato_id as string,
+    inmuebleId: r.inmueble_id as string,
+    periodo: r.periodo as string,
+    fechaPago: r.fecha_pago as string,
+    fechaReporte: r.fecha_reporte as string,
+    fechaVencimiento: r.fecha_vencimiento as string,
+    valorPagado: Number(r.valor_pagado),
+    estado: r.estado as PagoServicioPublico["estado"],
+    comprobanteUrl: r.comprobante_url as string | undefined,
+    reportadoPorId: r.reportado_por_id as string,
+    validadoPorId: (r.validado_por_id as string) || undefined,
+    fechaValidacion: r.fecha_validacion as string | undefined,
+    motivoRechazo: r.motivo_rechazo as string | undefined,
+    observaciones: r.observaciones as string | undefined,
+  };
+}
+
+function toPagoServicioRow(i: Partial<PagoServicioPublico>) {
+  return {
+    servicio_publico_contrato_id: i.servicioPublicoContratoId,
+    contrato_id: i.contratoId,
+    inmueble_id: i.inmuebleId,
+    periodo: i.periodo,
+    fecha_pago: i.fechaPago,
+    fecha_reporte: i.fechaReporte,
+    fecha_vencimiento: i.fechaVencimiento,
+    valor_pagado: i.valorPagado,
+    estado: i.estado,
+    comprobante_url: i.comprobanteUrl,
+    reportado_por_id: i.reportadoPorId,
+    validado_por_id: nullableFkId(i.validadoPorId),
+    fecha_validacion: i.fechaValidacion,
+    motivo_rechazo: i.motivoRechazo,
+    observaciones: i.observaciones,
+  };
+}
 
 export const supabaseServicesRepository: ServiciosContratoRepository = {
   findAll: async () => {
     const sb = requireSupabase();
     const { data, error } = await sb.from("servicios_publicos_contrato").select("*");
     if (error) throw error;
-    return (data ?? []) as unknown as ServicioPublicoContrato[];
+    return (data ?? []).map((r) => mapServicioRow(r as Record<string, unknown>));
   },
   findById: async (id) => {
     const sb = requireSupabase();
@@ -30,7 +98,7 @@ export const supabaseServicesRepository: ServiciosContratoRepository = {
       .select("*")
       .eq("id", id)
       .maybeSingle();
-    return (data as unknown as ServicioPublicoContrato) ?? null;
+    return data ? mapServicioRow(data as Record<string, unknown>) : null;
   },
   findByContratoId: async (contratoId) => {
     const sb = requireSupabase();
@@ -39,13 +107,39 @@ export const supabaseServicesRepository: ServiciosContratoRepository = {
       .select("*")
       .eq("contrato_id", contratoId);
     if (error) throw error;
-    return (data ?? []) as unknown as ServicioPublicoContrato[];
+    return (data ?? []).map((r) => mapServicioRow(r as Record<string, unknown>));
   },
-  create: async (_input: CreateInput<ServicioPublicoContrato>) => {
-    throw new Error(NOT_READY);
+  create: async (input) => {
+    const sb = requireSupabase();
+    const { data: existing } = await sb.from("servicios_publicos_contrato").select("code");
+    const code = generateUniqueCode(
+      ENTITY_CODE_PREFIX.servicioContrato,
+      extractEntityCodes(existing)
+    );
+    const { data, error } = await sb
+      .from("servicios_publicos_contrato")
+      .insert({ ...toServicioRow(input), code })
+      .select()
+      .single();
+    if (error) throw error;
+    return mapServicioRow(data as Record<string, unknown>);
   },
-  update: async (_id: string, _input: UpdateInput<ServicioPublicoContrato>) => null,
-  delete: async () => false,
+  update: async (id, input) => {
+    const sb = requireSupabase();
+    const { data, error } = await sb
+      .from("servicios_publicos_contrato")
+      .update(toServicioRow(input))
+      .eq("id", id)
+      .select()
+      .maybeSingle();
+    if (error) throw error;
+    return data ? mapServicioRow(data as Record<string, unknown>) : null;
+  },
+  delete: async (id) => {
+    const sb = requireSupabase();
+    const { error } = await sb.from("servicios_publicos_contrato").delete().eq("id", id);
+    return !error;
+  },
 };
 
 export const supabasePagosServicioRepository: PagosServicioRepository = {
@@ -53,12 +147,12 @@ export const supabasePagosServicioRepository: PagosServicioRepository = {
     const sb = requireSupabase();
     const { data, error } = await sb.from("pagos_servicios_publicos").select("*");
     if (error) throw error;
-    return (data ?? []) as unknown as PagoServicioPublico[];
+    return (data ?? []).map((r) => mapPagoServicioRow(r as Record<string, unknown>));
   },
   findById: async (id) => {
     const sb = requireSupabase();
     const { data } = await sb.from("pagos_servicios_publicos").select("*").eq("id", id).maybeSingle();
-    return (data as unknown as PagoServicioPublico) ?? null;
+    return data ? mapPagoServicioRow(data as Record<string, unknown>) : null;
   },
   findByServicioContratoId: async (servicioId) => {
     const sb = requireSupabase();
@@ -66,20 +160,37 @@ export const supabasePagosServicioRepository: PagosServicioRepository = {
       .from("pagos_servicios_publicos")
       .select("*")
       .eq("servicio_publico_contrato_id", servicioId);
-    if (error) {
-      const { data: alt } = await sb
-        .from("pagos_servicios_publicos")
-        .select("*")
-        .eq("servicio_publico_contrato_id", servicioId);
-      return (alt ?? []) as unknown as PagoServicioPublico[];
-    }
-    return (data ?? []) as unknown as PagoServicioPublico[];
+    if (error) throw error;
+    return (data ?? []).map((r) => mapPagoServicioRow(r as Record<string, unknown>));
   },
-  create: async () => {
-    throw new Error(NOT_READY);
+  create: async (input) => {
+    const sb = requireSupabase();
+    const { data: existing } = await sb.from("pagos_servicios_publicos").select("code");
+    const code = generateUniqueCode(ENTITY_CODE_PREFIX.pagoServicio, extractEntityCodes(existing));
+    const { data, error } = await sb
+      .from("pagos_servicios_publicos")
+      .insert({ ...toPagoServicioRow(input), code })
+      .select()
+      .single();
+    if (error) throw error;
+    return mapPagoServicioRow(data as Record<string, unknown>);
   },
-  update: async () => null,
-  delete: async () => false,
+  update: async (id, input) => {
+    const sb = requireSupabase();
+    const { data, error } = await sb
+      .from("pagos_servicios_publicos")
+      .update(toPagoServicioRow(input))
+      .eq("id", id)
+      .select()
+      .maybeSingle();
+    if (error) throw error;
+    return data ? mapPagoServicioRow(data as Record<string, unknown>) : null;
+  },
+  delete: async (id) => {
+    const sb = requireSupabase();
+    const { error } = await sb.from("pagos_servicios_publicos").delete().eq("id", id);
+    return !error;
+  },
 };
 
 function mapNotificacionRow(r: Record<string, unknown>): Notificacion {

@@ -1,25 +1,35 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-import { isMockMode } from "@/config/app-mode";
+import { hasSupabaseEnv, isMockMode } from "@/config/app-mode";
+import { getNormalizedSupabaseUrl, getSupabaseAnonKey } from "@/lib/supabase/env";
 import type { Database } from "@/lib/supabase/types";
 
 let browserClient: SupabaseClient<Database> | null = null;
+let browserClientUrl: string | null = null;
 
-/** Cliente Supabase singleton (browser / entorno compartido). */
-export function getSupabaseClient(): SupabaseClient<Database> | null {
-  if (isMockMode()) return null;
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+function createBrowserClient(): SupabaseClient<Database> | null {
+  if (isMockMode() || !hasSupabaseEnv()) return null;
+  const url = getNormalizedSupabaseUrl();
+  const key = getSupabaseAnonKey();
   if (!url || !key) return null;
-  if (!browserClient) {
-    browserClient = createClient<Database>(url, key);
+
+  if (browserClient && browserClientUrl === url) {
+    return browserClient;
   }
+
+  browserClient = createClient<Database>(url, key);
+  browserClientUrl = url;
   return browserClient;
 }
 
+/** Cliente Supabase singleton (browser / entorno compartido). */
+export function getSupabaseClient(): SupabaseClient<Database> | null {
+  return createBrowserClient();
+}
+
 export function createSupabaseBrowserClient(): SupabaseClient<Database> | null {
-  if (isMockMode()) return null;
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  if (isMockMode() || !hasSupabaseEnv()) return null;
+  const url = getNormalizedSupabaseUrl();
+  const key = getSupabaseAnonKey();
   if (!url || !key) return null;
   return createClient<Database>(url, key);
 }

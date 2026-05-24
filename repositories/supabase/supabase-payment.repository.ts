@@ -1,5 +1,5 @@
 import { ENTITY_CODE_PREFIX, generateUniqueCode } from "@/lib/entity-codes";
-import { requireSupabase, extractEntityCodes } from "@/lib/supabase/helpers";
+import { extractEntityCodes, nullableFkId, requireSupabase } from "@/lib/supabase/helpers";
 import type { PagosRepository } from "@/repositories/pagos.repository";
 import type {
   CreateSoportePagoInput,
@@ -9,6 +9,23 @@ import type { CreateInput, PagoReportado, UpdateInput } from "@/types";
 import type { SoportePago } from "@/types/soporte-pago";
 
 const TABLE_PAGOS = "pagos_canon" as const;
+
+function nextNumeroSoporte(existing: string[]): string {
+  const year = new Date().getFullYear();
+  const prefix = `SP-${year}-`;
+  const nums = existing
+    .filter((n) => n.startsWith(prefix))
+    .map((n) => parseInt(n.slice(prefix.length), 10))
+    .filter((n) => !Number.isNaN(n));
+  const next = (nums.length ? Math.max(...nums) : 0) + 1;
+  return `${prefix}${String(next).padStart(4, "0")}`;
+}
+
+function rowWithoutUndefined<T extends Record<string, unknown>>(row: T): Partial<T> {
+  return Object.fromEntries(
+    Object.entries(row).filter(([, value]) => value !== undefined)
+  ) as Partial<T>;
+}
 
 function mapPagoRow(r: Record<string, unknown>): PagoReportado {
   return {
@@ -32,7 +49,7 @@ function mapPagoRow(r: Record<string, unknown>): PagoReportado {
 }
 
 function toPagoRow(i: Partial<PagoReportado>) {
-  return {
+  return rowWithoutUndefined({
     contrato_id: i.contratoId,
     mes: i.mes,
     monto: i.monto,
@@ -43,11 +60,11 @@ function toPagoRow(i: Partial<PagoReportado>) {
     medio_pago: i.medioPago,
     reportado_por_id: i.reportadoPorId,
     fecha_validacion: i.fechaValidacion,
-    validado_por_id: i.validadoPorId,
-    rechazado_por_id: i.rechazadoPorId,
+    validado_por_id: nullableFkId(i.validadoPorId),
+    rechazado_por_id: nullableFkId(i.rechazadoPorId),
     motivo_rechazo: i.motivoRechazo,
-    soporte_pago_id: i.soportePagoId,
-  };
+    soporte_pago_id: nullableFkId(i.soportePagoId),
+  });
 }
 
 function mapSoporteRow(r: Record<string, unknown>): SoportePago {
@@ -68,7 +85,7 @@ function mapSoporteRow(r: Record<string, unknown>): SoportePago {
 }
 
 function toSoporteRow(s: Partial<SoportePago>) {
-  return {
+  return rowWithoutUndefined({
     pago_id: s.pagoId,
     contrato_id: s.contratoId,
     arrendador_id: s.arrendadorId,
@@ -80,7 +97,7 @@ function toSoporteRow(s: Partial<SoportePago>) {
     medio_pago: s.medioPago,
     observaciones: s.observaciones,
     estado_envio_email: s.estadoEnvioEmail,
-  };
+  });
 }
 
 export const supabasePaymentRepository: PagosRepository = {
@@ -143,7 +160,30 @@ export const supabaseSoportePagoRepository: SoportePagoRepository = {
   },
   create: async (input: CreateSoportePagoInput) => {
     const sb = requireSupabase();
-    const { data, error } = await sb.from("soportes_pago").insert(toSoporteRow(input)).select().single();
+    let numeroSoporte = input.numeroSoporte;
+    if (!numeroSoporte) {
+      const { data: existing } = await sb.from("soportes_pago").select("numero_soporte");
+      const numeros = (existing ?? []).map(
+        (r) => (r as { numero_soporte: string }).numero_soporte
+      );
+      numeroSoporte = nextNumeroSoporte(numeros);
+    }
+    const fechaGeneracion =
+      input.fechaGeneracion.includes("T") || input.fechaGeneracion.includes(" ")
+        ? input.fechaGeneracion
+        : `${input.fechaGeneracion}T12:00:00.000Z`;
+    const { data, error } = await sb
+      .from("soportes_pago")
+      .insert(
+        toSoporteRow({
+          ...input,
+          numeroSoporte,
+          fechaGeneracion,
+          estadoEnvioEmail: input.estadoEnvioEmail ?? "PENDIENTE",
+        })
+      )
+      .select()
+      .single();
     if (error) throw error;
     return mapSoporteRow(data as Record<string, unknown>);
   },

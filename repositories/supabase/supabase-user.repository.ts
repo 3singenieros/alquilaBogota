@@ -1,4 +1,5 @@
 import { ENTITY_CODE_PREFIX, generateUniqueCode } from "@/lib/entity-codes";
+import { profileToUsuario } from "@/lib/auth/profile-session";
 import { requireSupabase, extractEntityCodes } from "@/lib/supabase/helpers";
 import type { UsuariosRepository } from "@/repositories/usuarios.repository";
 import type { ProfileRepository } from "@/repositories/profile.repository";
@@ -126,6 +127,41 @@ export const supabaseUserRepository: UsuariosRepository = {
       .update({ deleted_at: new Date().toISOString(), activo: false })
       .eq("id", id);
     return !error;
+  },
+  syncFromProfile: async (profile) => {
+    const sb = requireSupabase();
+    const usuario = profileToUsuario(profile);
+    const { data: existingById } = await sb
+      .from("usuarios")
+      .select("code")
+      .eq("id", profile.id)
+      .maybeSingle();
+
+    let code = existingById?.code as string | undefined;
+    if (!code) {
+      const { data: allCodes } = await sb.from("usuarios").select("code");
+      const codes = extractEntityCodes(allCodes);
+      code = codes.includes(usuario.code)
+        ? generateUniqueCode(ENTITY_CODE_PREFIX.usuario, codes)
+        : usuario.code;
+    }
+
+    const row = {
+      id: profile.id,
+      code,
+      ...toUsuarioRow({
+        ...usuario,
+        rol: usuario.rolActivo,
+      }),
+    };
+
+    const { data, error } = await sb
+      .from("usuarios")
+      .upsert(row, { onConflict: "id" })
+      .select()
+      .single();
+    if (error) throw error;
+    return mapUsuarioRow(data as Record<string, unknown>);
   },
 };
 

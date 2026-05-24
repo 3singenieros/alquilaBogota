@@ -17,7 +17,7 @@ export function requireSupabase(): SupabaseClient {
   const client = getSupabase();
   if (!client) {
     throw new Error(
-      `Supabase no configurado (APP_MODE=${getAppMode()}). Revise NEXT_PUBLIC_SUPABASE_URL y NEXT_PUBLIC_SUPABASE_ANON_KEY.`
+      `Supabase está activo pero faltan NEXT_PUBLIC_SUPABASE_URL o NEXT_PUBLIC_SUPABASE_ANON_KEY. (APP_MODE=${getAppMode()})`
     );
   }
   return client;
@@ -25,4 +25,10 @@ export function requireSupabase(): SupabaseClient {
 
 export function extractEntityCodes(rows: unknown): string[] {
   return ((rows as { code: string }[] | null) ?? []).map((r) => r.code);
+}
+
+/** Convierte IDs vacíos a null para FKs opcionales en PostgreSQL. */
+export function nullableFkId(value?: string | null): string | null {
+  const trimmed = value?.trim();
+  return trimmed ? trimmed : null;
 }

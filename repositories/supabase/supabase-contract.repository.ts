@@ -1,5 +1,5 @@
 import { ENTITY_CODE_PREFIX, generateUniqueCode } from "@/lib/entity-codes";
-import { requireSupabase, extractEntityCodes } from "@/lib/supabase/helpers";
+import { requireSupabase, extractEntityCodes, nullableFkId } from "@/lib/supabase/helpers";
 import type { ContratosRepository } from "@/repositories/contratos.repository";
 import type { InvitacionesContratoRepository } from "@/repositories/invitaciones-contrato.repository";
 import type { Contrato, CreateInput, InvitacionContrato, UpdateInput } from "@/types";
@@ -44,7 +44,7 @@ function mapContratoRow(r: Record<string, unknown>): Contrato {
 function toContratoRow(i: Partial<Contrato>) {
   return {
     inmueble_id: i.inmuebleId,
-    arrendatario_id: i.arrendatarioId,
+    arrendatario_id: nullableFkId(i.arrendatarioId),
     email_arrendatario: i.emailArrendatario,
     nombre_arrendatario: i.nombreArrendatario,
     arrendador_id: i.arrendadorId,

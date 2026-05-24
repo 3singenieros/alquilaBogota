@@ -1,31 +1,41 @@
 import { ENTITY_CODE_PREFIX, generateUniqueCode } from "@/lib/entity-codes";
-import { requireSupabase, extractEntityCodes } from "@/lib/supabase/helpers";
+import { extractEntityCodes, requireSupabase } from "@/lib/supabase/helpers";
 import type { NoRenovacionRepository } from "@/repositories/no-renovacion.repository";
 import type { CreateInput, NoRenovacion, UpdateInput } from "@/types";
 
 const TABLE = "no_renovaciones" as const;
 
-function mapRow(r: Record<string, unknown>): NoRenovacion {
-  if (r.datos && typeof r.datos === "object") {
-    const datos = r.datos as NoRenovacion;
-    return {
-      ...datos,
-      id: (r.id as string) ?? datos.id,
-      code: (r.code as string) ?? datos.code,
-      estado: (r.estado as NoRenovacion["estado"]) ?? datos.estado,
-    };
-  }
-  return r as unknown as NoRenovacion;
+function rowWithoutUndefined<T extends Record<string, unknown>>(row: T): Partial<T> {
+  return Object.fromEntries(
+    Object.entries(row).filter(([, value]) => value !== undefined)
+  ) as Partial<T>;
 }
 
-function toRow(i: Partial<NoRenovacion>) {
+function mapRow(r: Record<string, unknown>): NoRenovacion {
+  const datos =
+    r.datos && typeof r.datos === "object"
+      ? (r.datos as Partial<NoRenovacion>)
+      : {};
+
   return {
-    contrato_id: i.contratoId,
-    inmueble_id: i.inmuebleId,
-    motivo: i.motivo,
-    estado: i.estado,
-    datos: i,
+    ...(datos as NoRenovacion),
+    id: (r.id as string) ?? datos.id ?? "",
+    code: (r.code as string) ?? datos.code ?? "",
+    contratoId: (r.contrato_id as string) ?? datos.contratoId ?? "",
+    inmuebleId: (r.inmueble_id as string) ?? datos.inmuebleId ?? "",
+    estado: (r.estado as NoRenovacion["estado"]) ?? datos.estado ?? "BORRADOR",
+    motivo: (r.motivo as string | undefined) ?? datos.motivo,
   };
+}
+
+function toColumns(item: Partial<NoRenovacion>) {
+  return rowWithoutUndefined({
+    contrato_id: item.contratoId,
+    inmueble_id: item.inmuebleId,
+    motivo: item.motivo,
+    estado: item.estado,
+    datos: item,
+  });
 }
 
 export const supabaseNonRenewalRepository: NoRenovacionRepository = {
@@ -44,9 +54,10 @@ export const supabaseNonRenewalRepository: NoRenovacionRepository = {
     const sb = requireSupabase();
     const { data: existing } = await sb.from(TABLE).select("code");
     const code = generateUniqueCode(ENTITY_CODE_PREFIX.noRenovacion, extractEntityCodes(existing));
+    const payload = { ...input, estado: input.estado ?? "BORRADOR" };
     const { data, error } = await sb
       .from(TABLE)
-      .insert({ ...toRow(input), code })
+      .insert({ ...toColumns(payload), code })
       .select()
       .single();
     if (error) throw error;
@@ -54,12 +65,26 @@ export const supabaseNonRenewalRepository: NoRenovacionRepository = {
   },
   update: async (id, input) => {
     const sb = requireSupabase();
-    const { data } = await sb
+    const { data: current } = await sb.from(TABLE).select("*").eq("id", id).maybeSingle();
+    if (!current) return null;
+
+    const existing = mapRow(current as Record<string, unknown>);
+    const merged: NoRenovacion = {
+      ...existing,
+      ...input,
+      id: existing.id,
+      code: existing.code,
+      contratoId: input.contratoId ?? existing.contratoId,
+      inmuebleId: input.inmuebleId ?? existing.inmuebleId,
+    };
+
+    const { data, error } = await sb
       .from(TABLE)
-      .update({ ...toRow(input), datos: input })
+      .update(toColumns(merged))
       .eq("id", id)
       .select()
       .maybeSingle();
+    if (error) throw error;
     return data ? mapRow(data as Record<string, unknown>) : null;
   },
   delete: async (id) => {

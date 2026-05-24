@@ -9,6 +9,7 @@ import type { SessionTokenPayload } from "@/lib/auth/session-token";
 import { auditActorFromUsuario, getAuditActor } from "@/lib/audit/actor";
 import { traceEvento } from "@/lib/audit/trace-helper";
 import { getProfileRepository } from "@/repositories";
+import { syncUsuarioFromProfile } from "@/services/usuario-sync.service";
 import type { Rol } from "@/types";
 import type { CreateProfileInput, RoleProfileData, UserProfile } from "@/types/profile";
 
@@ -283,6 +284,7 @@ export async function completeOnboarding(
   const actor = auditActorFromUsuario(
     profileToUsuario(profile, photoURL)
   );
+  await syncUsuarioFromProfile(profile);
   await traceEvento(actor, {
     entidadTipo: "USUARIO",
     entidadId: profile.id,

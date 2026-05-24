@@ -15,6 +15,7 @@ import {
   ensureProfileFromSessionPayload,
   findProfileByLookup,
 } from "@/services/profile.service";
+import { syncUsuarioFromProfile } from "@/services/usuario-sync.service";
 import type { AuthSession } from "@/types/auth";
 import type { Rol, Usuario } from "@/types";
 import { cookies } from "next/headers";
@@ -49,6 +50,7 @@ async function buildUsuarioFromPayload(
     }));
 
   if (profile?.perfilCompletado) {
+    await syncUsuarioFromProfile(profile);
     return profileToUsuario(profile, payload.photoURL);
   }
 

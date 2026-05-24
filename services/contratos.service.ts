@@ -24,6 +24,8 @@ import {
   getInvitacionesContratoRepository,
   getUsuariosRepository,
 } from "@/repositories";
+import { getProfileByEmail } from "@/services/profile.service";
+import { syncUsuarioFromProfile } from "@/services/usuario-sync.service";
 import { registrarNotificacion } from "@/services/notificaciones.service";
 import { listarInmueblesReferencia } from "@/services/inmuebles.service";
 import { crearNotificacionReajusteCanon } from "@/services/notificaciones.service";
@@ -33,6 +35,25 @@ import type { Contrato, CreateInput, EstadoContrato, UpdateInput } from "@/types
 
 function generarTokenInvitacion(): string {
   return `inv-${crypto.randomUUID()}`;
+}
+
+async function resolveArrendatarioIdForContrato(
+  arrendatarioId: string | undefined,
+  emailArrendatario: string
+): Promise<string> {
+  const trimmedId = arrendatarioId?.trim();
+  if (trimmedId) {
+    const usuario = await getUsuariosRepository().findById(trimmedId);
+    if (usuario) return trimmedId;
+  }
+
+  const profile = await getProfileByEmail(emailArrendatario);
+  if (profile?.perfilCompletado) {
+    await syncUsuarioFromProfile(profile);
+    return profile.id;
+  }
+
+  return "";
 }
 
 async function assertUnSoloContratoActivoPorInmueble(
@@ -88,10 +109,14 @@ export async function crearContrato(data: CreateInput<Contrato>) {
   }
 
   const docs = prepararDocumentosContrato(data.documentosAdjuntos, data.documentoUrl);
+  const arrendatarioId = await resolveArrendatarioIdForContrato(
+    data.arrendatarioId,
+    emailArrendatario
+  );
   const payload = buildContratoCreateInput({
     ...data,
     emailArrendatario,
-    arrendatarioId: data.arrendatarioId || "",
+    arrendatarioId,
     estado: "PENDIENTE_CONFIRMACION",
     documentosAdjuntos: docs.documentosAdjuntos,
     documentoUrl: docs.documentoUrl,

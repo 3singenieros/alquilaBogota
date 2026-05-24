@@ -475,19 +475,47 @@ end $$;
 
 -- ---------------------------------------------------------------------------
 -- RLS (políticas permisivas demo — ver docs/database/rls-strategy.md)
+-- Supabase habilita RLS por defecto; sin política = todo bloqueado (42501).
+-- Si ya ejecutó el schema antes, corra también: supabase-rls-demo.sql
 -- ---------------------------------------------------------------------------
 
+alter table profiles enable row level security;
 alter table usuarios enable row level security;
+alter table user_roles enable row level security;
 alter table inmuebles enable row level security;
 alter table contratos enable row level security;
+alter table invitaciones_contrato enable row level security;
 alter table pagos_canon enable row level security;
+alter table soportes_pago enable row level security;
+alter table servicios_publicos_contrato enable row level security;
+alter table pagos_servicios_publicos enable row level security;
+alter table mantenimientos enable row level security;
+alter table mantenimiento_comentarios enable row level security;
+alter table mantenimiento_documentos enable row level security;
+alter table no_renovaciones enable row level security;
+alter table notificaciones enable row level security;
 alter table evento_trazabilidad enable row level security;
+alter table archivo_adjunto enable row level security;
+alter table contrato_documentos enable row level security;
 
+create policy "mvp_demo_profiles" on profiles for all using (true) with check (true);
 create policy "mvp_demo_usuarios" on usuarios for all using (true) with check (true);
+create policy "mvp_demo_user_roles" on user_roles for all using (true) with check (true);
 create policy "mvp_demo_inmuebles" on inmuebles for all using (true) with check (true);
 create policy "mvp_demo_contratos" on contratos for all using (true) with check (true);
+create policy "mvp_demo_invitaciones" on invitaciones_contrato for all using (true) with check (true);
 create policy "mvp_demo_pagos_canon" on pagos_canon for all using (true) with check (true);
+create policy "mvp_demo_soportes_pago" on soportes_pago for all using (true) with check (true);
+create policy "mvp_demo_servicios_contrato" on servicios_publicos_contrato for all using (true) with check (true);
+create policy "mvp_demo_pagos_servicio" on pagos_servicios_publicos for all using (true) with check (true);
+create policy "mvp_demo_mantenimientos" on mantenimientos for all using (true) with check (true);
+create policy "mvp_demo_mnt_comentarios" on mantenimiento_comentarios for all using (true) with check (true);
+create policy "mvp_demo_mnt_documentos" on mantenimiento_documentos for all using (true) with check (true);
+create policy "mvp_demo_no_renovaciones" on no_renovaciones for all using (true) with check (true);
+create policy "mvp_demo_notificaciones" on notificaciones for all using (true) with check (true);
 create policy "mvp_demo_trazabilidad" on evento_trazabilidad for all using (true) with check (true);
+create policy "mvp_demo_archivo_adjunto" on archivo_adjunto for all using (true) with check (true);
+create policy "mvp_demo_contrato_docs" on contrato_documentos for all using (true) with check (true);
 
 -- ---------------------------------------------------------------------------
 -- Storage buckets (crear en Dashboard > Storage o vía API):
