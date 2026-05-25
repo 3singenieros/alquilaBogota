@@ -1,13 +1,14 @@
 "use client";
 
+import { listarArchivosEntidadAction } from "@/app/actions/file-storage.actions";
 import { AttachmentsList } from "@/components/shared/attachments-list";
 import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
 import { totalAdjuntos } from "@/lib/archivos-adjuntos";
 import type { ArchivoAdjunto } from "@/types";
 import type { EntidadTipoTrazabilidad } from "@/types/trazabilidad";
-import { Paperclip } from "lucide-react";
-import { useState } from "react";
+import { Loader2, Paperclip } from "lucide-react";
+import { useEffect, useState } from "react";
 
 export function AdjuntosCount({
   listas,
@@ -39,9 +40,22 @@ export function VerAdjuntosButton({
 }) {
   const [open, setOpen] = useState(false);
   const [localListas, setLocalListas] = useState(listas);
+  const [loading, setLoading] = useState(false);
+  const [fetched, setFetched] = useState(false);
+
+  const propTotal = listas.reduce((s, l) => s + (l.archivos?.length ?? 0), 0);
   const total = localListas.reduce((s, l) => s + (l.archivos?.length ?? 0), 0);
 
-  if (total === 0) {
+  const puedeConsultar =
+    propTotal > 0 ||
+    Boolean(entidadTipo && entidadId) ||
+    listas.some((g) => g.entidadTipo && g.entidadId);
+
+  useEffect(() => {
+    setLocalListas(listas);
+  }, [listas]);
+
+  if (!puedeConsultar) {
     return <span className="text-xs text-slate-400">Sin adjuntos</span>;
   }
 
@@ -55,6 +69,29 @@ export function VerAdjuntosButton({
     );
   }
 
+  async function handleOpen() {
+    setOpen(true);
+    setLoading(true);
+    setFetched(false);
+    try {
+      const updated = await Promise.all(
+        listas.map(async (grupo) => {
+          const tipo = grupo.entidadTipo ?? entidadTipo;
+          const id = grupo.entidadId ?? entidadId;
+          if (tipo && id) {
+            const archivos = await listarArchivosEntidadAction(tipo, id);
+            return { ...grupo, archivos, entidadTipo: tipo, entidadId: id };
+          }
+          return grupo;
+        })
+      );
+      setLocalListas(updated);
+      setFetched(true);
+    } finally {
+      setLoading(false);
+    }
+  }
+
   return (
     <>
       <Button
@@ -62,13 +99,15 @@ export function VerAdjuntosButton({
         variant="ghost"
         size="sm"
         className="text-indigo-600"
-        onClick={() => {
-          setLocalListas(listas);
-          setOpen(true);
-        }}
+        disabled={loading}
+        onClick={() => void handleOpen()}
       >
-        <Paperclip className="mr-1 h-3.5 w-3.5" />
-        Ver adjuntos ({total})
+        {loading ? (
+          <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
+        ) : (
+          <Paperclip className="mr-1 h-3.5 w-3.5" />
+        )}
+        {propTotal > 0 ? `Ver adjuntos (${propTotal})` : "Ver comprobantes"}
       </Button>
       <Modal
         open={open}
@@ -81,22 +120,28 @@ export function VerAdjuntosButton({
         }
       >
         <div className="space-y-4">
-          {localListas.map(
-            (grupo, idx) =>
-              (grupo.archivos?.length ?? 0) > 0 && (
-                <div key={grupo.etiqueta}>
-                  <h4 className="mb-2 text-sm font-medium text-slate-700">
-                    {grupo.etiqueta}
-                  </h4>
-                  <AttachmentsList
-                    archivos={grupo.archivos ?? []}
-                    entidadTipo={grupo.entidadTipo ?? entidadTipo}
-                    entidadId={grupo.entidadId ?? entidadId}
-                    canDelete={canDelete}
-                    onDeleted={(id) => handleDeleted(idx, id)}
-                  />
-                </div>
-              )
+          {loading ? (
+            <p className="text-sm text-slate-500">Cargando documentos...</p>
+          ) : fetched && total === 0 ? (
+            <p className="text-sm text-slate-500">No hay documentos adjuntos.</p>
+          ) : (
+            localListas.map(
+              (grupo, idx) =>
+                (grupo.archivos?.length ?? 0) > 0 && (
+                  <div key={grupo.etiqueta}>
+                    <h4 className="mb-2 text-sm font-medium text-slate-700">
+                      {grupo.etiqueta}
+                    </h4>
+                    <AttachmentsList
+                      archivos={grupo.archivos ?? []}
+                      entidadTipo={grupo.entidadTipo ?? entidadTipo}
+                      entidadId={grupo.entidadId ?? entidadId}
+                      canDelete={canDelete}
+                      onDeleted={(id) => handleDeleted(idx, id)}
+                    />
+                  </div>
+                )
+            )
           )}
         </div>
       </Modal>

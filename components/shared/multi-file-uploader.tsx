@@ -70,11 +70,25 @@ export function MultiFileUploader({
 
     const list = Array.from(files);
 
-    if (mock || !uploadContext) {
+    if (mock) {
       const nuevos = archivosDesdeFiles(list, cargadoPor).map((a) => ({
         ...a,
         descripcion: descripciones[a.id] || a.descripcion,
       }));
+      onChange([...value, ...nuevos]);
+      return;
+    }
+
+    if (!uploadContext) {
+      const nuevos = archivosDesdeFiles(list, cargadoPor).map((a) => ({
+        ...a,
+        descripcion: descripciones[a.id] || a.descripcion,
+      }));
+      const nextPending = new Map(pendingById);
+      for (let i = 0; i < list.length; i++) {
+        nextPending.set(nuevos[i].id, list[i]);
+      }
+      setPendingById(nextPending);
       onChange([...value, ...nuevos]);
       return;
     }

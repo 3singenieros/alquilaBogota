@@ -45,19 +45,19 @@ export async function subirAdjuntosTrasCrear(
   return [...subidos, ...nuevos];
 }
 
-export async function subirYVincularPostCreate(
+export async function subirYVincularPostCreate<T = ArchivoAdjunto[]>(
   entityId: string,
   pendingFiles: File[],
   uploadMeta: Omit<UploadContext, "entidadId">,
-  vincular: (id: string, adjuntos: ArchivoAdjunto[]) => Promise<unknown>
-): Promise<ArchivoAdjunto[]> {
+  vincular: (id: string, adjuntos: ArchivoAdjunto[]) => Promise<T>
+): Promise<T | ArchivoAdjunto[]> {
   if (pendingFiles.length === 0) return [];
   const adjuntos = await subirArchivosCliente(pendingFiles, {
     ...uploadMeta,
     entidadId: entityId,
   });
   if (adjuntos.length > 0) {
-    await vincular(entityId, adjuntos);
+    return vincular(entityId, adjuntos);
   }
   return adjuntos;
 }

@@ -7,6 +7,10 @@ import type {
 } from "@/repositories/soporte-pago.repository";
 import type { CreateInput, PagoReportado, UpdateInput } from "@/types";
 import type { SoportePago } from "@/types/soporte-pago";
+import {
+  fetchAdjuntosPorEntidades,
+  pagoConComprobantes,
+} from "@/repositories/supabase/supabase-adjuntos-entidad";
 
 const TABLE_PAGOS = "pagos_canon" as const;
 
@@ -105,12 +109,20 @@ export const supabasePaymentRepository: PagosRepository = {
     const sb = requireSupabase();
     const { data, error } = await sb.from(TABLE_PAGOS).select("*");
     if (error) throw error;
-    return (data ?? []).map((r) => mapPagoRow(r as Record<string, unknown>));
+    const rows = (data ?? []).map((r) => mapPagoRow(r as Record<string, unknown>));
+    const adjMap = await fetchAdjuntosPorEntidades(
+      "PAGO",
+      rows.map((p) => p.id)
+    );
+    return rows.map((p) => ({ ...p, ...pagoConComprobantes(p, adjMap) }));
   },
   findById: async (id) => {
     const sb = requireSupabase();
     const { data } = await sb.from(TABLE_PAGOS).select("*").eq("id", id).maybeSingle();
-    return data ? mapPagoRow(data as Record<string, unknown>) : null;
+    if (!data) return null;
+    const pago = mapPagoRow(data as Record<string, unknown>);
+    const adjMap = await fetchAdjuntosPorEntidades("PAGO", [id]);
+    return { ...pago, ...pagoConComprobantes(pago, adjMap) };
   },
   create: async (input) => {
     const sb = requireSupabase();
@@ -132,7 +144,10 @@ export const supabasePaymentRepository: PagosRepository = {
       .eq("id", id)
       .select()
       .maybeSingle();
-    return data ? mapPagoRow(data as Record<string, unknown>) : null;
+    if (!data) return null;
+    const pago = mapPagoRow(data as Record<string, unknown>);
+    const adjMap = await fetchAdjuntosPorEntidades("PAGO", [id]);
+    return { ...pago, ...pagoConComprobantes(pago, adjMap) };
   },
   delete: async (id) => {
     const sb = requireSupabase();

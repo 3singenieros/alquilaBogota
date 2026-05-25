@@ -1,5 +1,6 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { listarContratosFormAction } from "@/app/(dashboard)/contratos/actions";
 import { listarInmueblesFormAction } from "@/app/(dashboard)/inmuebles/actions";
 import {
@@ -9,11 +10,12 @@ import {
   validarPagoAction,
   vincularComprobantesPagoAction,
 } from "@/app/(dashboard)/pagos/actions";
-import { SoportePagoDownload } from "@/components/pagos/soporte-pago-download";
+import { listarArchivosEntidadAction } from "@/app/actions/file-storage.actions";
 import { VerAdjuntosButton } from "@/components/shared/adjuntos-panel";
+import { AttachmentsList } from "@/components/shared/attachments-list";
 import { MultiFileUploader } from "@/components/shared/multi-file-uploader";
 import type { CargadoPorAdjunto } from "@/lib/archivos-adjuntos";
-import { subirYVincularPostCreate } from "@/lib/adjuntos-client";
+import { subirYVincularPostCreate, esAdjuntoPendienteSubida } from "@/lib/adjuntos-client";
 import type { ArchivoAdjunto } from "@/types";
 import { FilterBar } from "@/components/shared/filter-bar";
 import { StatusBadge, estadoVariant } from "@/components/ui/badge";
@@ -28,10 +30,29 @@ import { getModulePermissions } from "@/lib/auth/permissions";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import type { Contrato, EstadoPago, Inmueble, PagoReportado, Rol } from "@/types";
 import type { SoportePago, SoportePdfData } from "@/types/soporte-pago";
-import { Check, Eye, Plus, X } from "lucide-react";
+import { Check, Plus, X } from "lucide-react";
 import { useEffect, useMemo, useState, useTransition } from "react";
 
+const SoportePagoDownload = dynamic(
+  () =>
+    import("@/components/pagos/soporte-pago-download").then((mod) => ({
+      default: mod.SoportePagoDownload,
+    })),
+  {
+    ssr: false,
+    loading: () => (
+      <Button variant="secondary" size="sm" disabled type="button">
+        Cargando PDF...
+      </Button>
+    ),
+  }
+);
+
 const ESTADOS: EstadoPago[] = ["REPORTADO", "VALIDADO", "RECHAZADO"];
+
+function pagoTieneComprobantes(p: PagoReportado) {
+  return (p.comprobantesAdjuntos?.length ?? 0) > 0;
+}
 
 export function PagosModule({
   initialData,
@@ -61,6 +82,7 @@ export function PagosModule({
     rol,
   };
   const [comprobantes, setComprobantes] = useState<ArchivoAdjunto[]>([]);
+  const [uploadError, setUploadError] = useState<string | null>(null);
   const [pendingComprobantes, setPendingComprobantes] = useState<File[]>([]);
   const perms = getModulePermissions(rol, "pagos");
   const canReview = rol === "ARRENDADOR" || rol === "ADMIN";
@@ -77,7 +99,6 @@ export function PagosModule({
   const [open, setOpen] = useState(false);
   const [validateOpen, setValidateOpen] = useState(false);
   const [rejectOpen, setRejectOpen] = useState(false);
-  const [comprobanteOpen, setComprobanteOpen] = useState(false);
   const [target, setTarget] = useState<PagoReportado | null>(null);
   const [observaciones, setObservaciones] = useState("");
   const [motivoRechazo, setMotivoRechazo] = useState("");
@@ -100,6 +121,7 @@ export function PagosModule({
     ]);
     setContratosOptions(freshContratos);
     setInmueblesOptions(freshInmuebles);
+    setUploadError(null);
     setOpen(true);
   }
 
@@ -128,31 +150,61 @@ export function PagosModule({
       notas: (fd.get("notas") as string) || undefined,
     };
     startTransition(async () => {
-      const created = await crearPagoAction({
+      setUploadError(null);
+      let uploadErr: string | null = null;
+      let created = await crearPagoAction({
         ...payload,
         comprobantesAdjuntos: [],
       });
+      const hayComprobantesPendientes =
+        pendingComprobantes.length > 0 ||
+        comprobantes.some(esAdjuntoPendienteSubida);
       if (created && pendingComprobantes.length > 0) {
         const contrato = contratosOptions.find((c) => c.id === payload.contratoId);
-        await subirYVincularPostCreate(
-          created.id,
-          pendingComprobantes,
-          {
-            bucket: "pagos",
-            entidadTipo: "PAGO",
-            contratoId: payload.contratoId,
-            inmuebleId: contrato?.inmuebleId,
-          },
-          vincularComprobantesPagoAction
-        );
+        try {
+          const updated = await subirYVincularPostCreate(
+            created.id,
+            pendingComprobantes,
+            {
+              bucket: "pagos",
+              entidadTipo: "PAGO",
+              contratoId: payload.contratoId,
+              inmuebleId: contrato?.inmuebleId,
+            },
+            vincularComprobantesPagoAction
+          );
+          if (updated && "code" in updated) created = updated;
+        } catch (err) {
+          uploadErr =
+            err instanceof Error
+              ? err.message
+              : "No se pudieron subir los comprobantes a Storage.";
+        }
+      } else if (created && hayComprobantesPendientes) {
+        uploadErr =
+          "El pago se guardó pero los comprobantes no se subieron. Vuelve a intentarlo.";
       }
+      if (uploadErr) setUploadError(uploadErr);
       if (created) setItems((prev) => [...prev, created]);
       setComprobantes([]);
       setPendingComprobantes([]);
-      setOpen(false);
+      if (!uploadErr) setOpen(false);
     });
   }
 
+  async function abrirValidacion(p: PagoReportado) {
+    const docs = await listarArchivosEntidadAction("PAGO", p.id);
+    setTarget({ ...p, comprobantesAdjuntos: docs.length ? docs : p.comprobantesAdjuntos });
+    setObservaciones("");
+    setValidateOpen(true);
+  }
+
+  async function abrirRechazo(p: PagoReportado) {
+    const docs = await listarArchivosEntidadAction("PAGO", p.id);
+    setTarget({ ...p, comprobantesAdjuntos: docs.length ? docs : p.comprobantesAdjuntos });
+    setMotivoRechazo("");
+    setRejectOpen(true);
+  }
   function confirmarValidacion() {
     if (!target) return;
     startTransition(async () => {
@@ -262,33 +314,29 @@ export function PagosModule({
                   <Td>
                     <StatusBadge label={p.estado} variant={estadoVariant(p.estado)} />
                   </Td>
-                  <Td className="max-w-[100px] truncate text-xs text-indigo-600">
-                    {p.comprobanteUrl ?? "—"}
+                  <Td>
+                    <VerAdjuntosButton
+                      titulo={`Comprobantes — ${p.code}`}
+                      entidadTipo="PAGO"
+                      entidadId={p.id}
+                      listas={[
+                        {
+                          etiqueta: "Comprobante de pago",
+                          archivos: p.comprobantesAdjuntos,
+                          entidadTipo: "PAGO",
+                          entidadId: p.id,
+                        },
+                      ]}
+                    />
                   </Td>
                   <Td className="text-right whitespace-nowrap">
-                    {p.comprobanteUrl ? (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => {
-                          setTarget(p);
-                          setComprobanteOpen(true);
-                        }}
-                      >
-                        <Eye className="h-3.5 w-3.5" /> Ver
-                      </Button>
-                    ) : null}
                     {canReview && p.estado === "REPORTADO" ? (
                       <>
                         <Button
                           variant="secondary"
                           size="sm"
                           disabled={pending}
-                          onClick={() => {
-                            setTarget(p);
-                            setObservaciones("");
-                            setValidateOpen(true);
-                          }}
+                          onClick={() => void abrirValidacion(p)}
                         >
                           <Check className="h-3.5 w-3.5" /> Validar
                         </Button>
@@ -296,11 +344,7 @@ export function PagosModule({
                           variant="ghost"
                           size="sm"
                           disabled={pending}
-                          onClick={() => {
-                            setTarget(p);
-                            setMotivoRechazo("");
-                            setRejectOpen(true);
-                          }}
+                          onClick={() => void abrirRechazo(p)}
                         >
                           <X className="h-3.5 w-3.5 text-red-500" /> Rechazar
                         </Button>
@@ -363,6 +407,9 @@ export function PagosModule({
           <FormField label="Notas">
             <Input name="notas" />
           </FormField>
+          {uploadError ? (
+            <p className="text-sm text-red-600">{uploadError}</p>
+          ) : null}
         </form>
       </Modal>
 
@@ -403,6 +450,22 @@ export function PagosModule({
                 placeholder="Ej. Pago recibido correctamente"
               />
             </FormField>
+            {target && pagoTieneComprobantes(target) ? (
+              <div>
+                <p className="mb-2 text-xs font-medium text-slate-600">
+                  Comprobantes reportados por el arrendatario
+                </p>
+                <AttachmentsList
+                  archivos={target.comprobantesAdjuntos ?? []}
+                  entidadTipo="PAGO"
+                  entidadId={target.id}
+                />
+              </div>
+            ) : (
+              <p className="text-xs text-amber-700">
+                Este pago no tiene comprobantes adjuntos.
+              </p>
+            )}
             <p className="rounded-lg bg-emerald-50 px-3 py-2 text-emerald-800">
               Al validar se generará un soporte PDF y una notificación simulada para el
               arrendatario.
@@ -437,24 +500,16 @@ export function PagosModule({
             required
           />
         </FormField>
-      </Modal>
-
-      <Modal
-        open={comprobanteOpen}
-        onClose={() => setComprobanteOpen(false)}
-        title="Comprobante adjunto"
-        footer={
-          <Button variant="secondary" onClick={() => setComprobanteOpen(false)}>
-            Cerrar
-          </Button>
-        }
-      >
-        <p className="break-all font-mono text-sm text-indigo-700">
-          {target?.comprobanteUrl ?? "Sin comprobante"}
-        </p>
-        <p className="mt-2 text-xs text-slate-500">
-          Referencia simulada de archivo — en producción sería una URL de Storage.
-        </p>
+        {target && pagoTieneComprobantes(target) ? (
+          <div className="mt-4">
+            <p className="mb-2 text-xs font-medium text-slate-600">Comprobantes adjuntos</p>
+            <AttachmentsList
+              archivos={target.comprobantesAdjuntos ?? []}
+              entidadTipo="PAGO"
+              entidadId={target.id}
+            />
+          </div>
+        ) : null}
       </Modal>
     </>
   );
