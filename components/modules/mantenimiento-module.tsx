@@ -14,7 +14,7 @@ import { VerAdjuntosButton } from "@/components/shared/adjuntos-panel";
 import { MultiFileUploader } from "@/components/shared/multi-file-uploader";
 import { MantenimientoModalsEconomicos } from "@/components/mantenimiento/mantenimiento-modals-economicos";
 import type { CargadoPorAdjunto } from "@/lib/archivos-adjuntos";
-import { subirYVincularPostCreate } from "@/lib/adjuntos-client";
+import { esAdjuntoPendienteSubida, subirYVincularPostCreate } from "@/lib/adjuntos-client";
 import { FilterBar } from "@/components/shared/filter-bar";
 import { StatusBadge, estadoVariant } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -179,27 +179,48 @@ export function MantenimientoModule({
     };
     startTransition(async () => {
       try {
-        const created = await crearMantenimientoAction(payload);
+        let uploadErr: string | null = null;
+        let created = await crearMantenimientoAction(payload);
+        const hayEvidenciasPendientes =
+          pendingEvidenciasCreate.length > 0 ||
+          evidenciasCreate.some(esAdjuntoPendienteSubida);
         if (created && pendingEvidenciasCreate.length > 0) {
-          await subirYVincularPostCreate(
-            created.id,
-            pendingEvidenciasCreate,
-            {
-              bucket: "mantenimiento",
-              entidadTipo: "MANTENIMIENTO",
-              inmuebleId: created.inmuebleId,
-              linkMantenimientoId: created.id,
-              linkMantenimientoTipo: "EVIDENCIA",
-            },
-            (id, adj) => vincularEvidenciasMantenimientoAction(id, adj, "evidenciasAdjuntas")
-          );
+          try {
+            const updated = await subirYVincularPostCreate(
+              created.id,
+              pendingEvidenciasCreate,
+              {
+                bucket: "mantenimiento",
+                entidadTipo: "MANTENIMIENTO",
+                inmuebleId: created.inmuebleId,
+                linkMantenimientoId: created.id,
+                linkMantenimientoTipo: "EVIDENCIA",
+              },
+              (id, adj) => vincularEvidenciasMantenimientoAction(id, adj, "evidenciasAdjuntas")
+            );
+            if (updated && "code" in updated) {
+              created = updated;
+            }
+          } catch (uploadEx) {
+            uploadErr =
+              uploadEx instanceof Error
+                ? uploadEx.message
+                : "No se pudieron subir las evidencias a Storage.";
+          }
+        } else if (created && hayEvidenciasPendientes) {
+          uploadErr =
+            "La solicitud se creó pero las evidencias no se subieron. Vuelve a intentarlo.";
         }
         if (created) {
           setItems((prev) => [...prev, created]);
-          setOpen(false);
           setEvidenciasCreate([]);
           setPendingEvidenciasCreate([]);
           form.reset();
+          if (!uploadErr) {
+            setOpen(false);
+          } else {
+            setFormError(uploadErr);
+          }
         }
       } catch (err) {
         setFormError(err instanceof Error ? err.message : "No se pudo crear la solicitud");
@@ -380,9 +401,24 @@ export function MantenimientoModule({
                 </Td>
                 <Td>
                   <VerAdjuntosButton
+                    titulo={`Adjuntos — ${m.code}`}
+                    entidadTipo="MANTENIMIENTO"
+                    entidadId={m.id}
                     listas={[
-                      { etiqueta: "Evidencias", archivos: m.evidenciasAdjuntas },
-                      { etiqueta: "Cierre", archivos: m.documentosCierreAdjuntos },
+                      {
+                        etiqueta: "Evidencias",
+                        archivos: m.evidenciasAdjuntas,
+                        entidadTipo: "MANTENIMIENTO",
+                        entidadId: m.id,
+                        tipoDocumento: "EVIDENCIA",
+                      },
+                      {
+                        etiqueta: "Cierre",
+                        archivos: m.documentosCierreAdjuntos,
+                        entidadTipo: "MANTENIMIENTO",
+                        entidadId: m.id,
+                        tipoDocumento: "CIERRE",
+                      },
                     ]}
                   />
                 </Td>
@@ -788,9 +824,23 @@ export function MantenimientoModule({
               <div className="sm:col-span-2">
                 <VerAdjuntosButton
                   titulo="Adjuntos del ticket"
+                  entidadTipo="MANTENIMIENTO"
+                  entidadId={selected.id}
                   listas={[
-                    { etiqueta: "Evidencias", archivos: selected.evidenciasAdjuntas },
-                    { etiqueta: "Cierre", archivos: selected.documentosCierreAdjuntos },
+                    {
+                      etiqueta: "Evidencias",
+                      archivos: selected.evidenciasAdjuntas,
+                      entidadTipo: "MANTENIMIENTO",
+                      entidadId: selected.id,
+                      tipoDocumento: "EVIDENCIA",
+                    },
+                    {
+                      etiqueta: "Cierre",
+                      archivos: selected.documentosCierreAdjuntos,
+                      entidadTipo: "MANTENIMIENTO",
+                      entidadId: selected.id,
+                      tipoDocumento: "CIERRE",
+                    },
                   ]}
                 />
               </div>

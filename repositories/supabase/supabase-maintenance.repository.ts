@@ -3,6 +3,10 @@ import { requireSupabase, extractEntityCodes } from "@/lib/supabase/helpers";
 import type { MantenimientoRepository } from "@/repositories/mantenimiento.repository";
 import type { ComentariosMantenimientoRepository } from "@/repositories/comentarios-mantenimiento.repository";
 import type { ComentarioMantenimiento, CreateInput, Mantenimiento, UpdateInput } from "@/types";
+import {
+  fetchAdjuntosMantenimientoPorIds,
+  mantenimientoConAdjuntos,
+} from "@/repositories/supabase/supabase-adjuntos-entidad";
 
 const TABLE = "mantenimientos" as const;
 
@@ -67,12 +71,17 @@ export const supabaseMaintenanceRepository: MantenimientoRepository = {
     const sb = requireSupabase();
     const { data, error } = await sb.from(TABLE).select("*");
     if (error) throw error;
-    return (data ?? []).map((r) => mapRow(r as Record<string, unknown>));
+    const rows = (data ?? []).map((r) => mapRow(r as Record<string, unknown>));
+    const adjMap = await fetchAdjuntosMantenimientoPorIds(rows.map((m) => m.id));
+    return rows.map((m) => ({ ...m, ...mantenimientoConAdjuntos(m, adjMap) }));
   },
   findById: async (id) => {
     const sb = requireSupabase();
     const { data } = await sb.from(TABLE).select("*").eq("id", id).maybeSingle();
-    return data ? mapRow(data as Record<string, unknown>) : null;
+    if (!data) return null;
+    const m = mapRow(data as Record<string, unknown>);
+    const adjMap = await fetchAdjuntosMantenimientoPorIds([id]);
+    return { ...m, ...mantenimientoConAdjuntos(m, adjMap) };
   },
   create: async (input) => {
     const sb = requireSupabase();
@@ -89,7 +98,10 @@ export const supabaseMaintenanceRepository: MantenimientoRepository = {
   update: async (id, input) => {
     const sb = requireSupabase();
     const { data } = await sb.from(TABLE).update(toRow(input)).eq("id", id).select().maybeSingle();
-    return data ? mapRow(data as Record<string, unknown>) : null;
+    if (!data) return null;
+    const m = mapRow(data as Record<string, unknown>);
+    const adjMap = await fetchAdjuntosMantenimientoPorIds([id]);
+    return { ...m, ...mantenimientoConAdjuntos(m, adjMap) };
   },
   delete: async (id) => {
     const sb = requireSupabase();

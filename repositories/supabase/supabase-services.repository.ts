@@ -13,6 +13,10 @@ import type {
   ServicioPublicoContrato,
   UpdateInput,
 } from "@/types";
+import {
+  fetchAdjuntosPorEntidades,
+  pagoServicioConComprobantes,
+} from "@/repositories/supabase/supabase-adjuntos-entidad";
 
 function mapServicioRow(r: Record<string, unknown>): ServicioPublicoContrato {
   return {
@@ -147,12 +151,20 @@ export const supabasePagosServicioRepository: PagosServicioRepository = {
     const sb = requireSupabase();
     const { data, error } = await sb.from("pagos_servicios_publicos").select("*");
     if (error) throw error;
-    return (data ?? []).map((r) => mapPagoServicioRow(r as Record<string, unknown>));
+    const rows = (data ?? []).map((r) => mapPagoServicioRow(r as Record<string, unknown>));
+    const adjMap = await fetchAdjuntosPorEntidades(
+      "PAGO_SERVICIO_PUBLICO",
+      rows.map((p) => p.id)
+    );
+    return rows.map((p) => ({ ...p, ...pagoServicioConComprobantes(p, adjMap) }));
   },
   findById: async (id) => {
     const sb = requireSupabase();
     const { data } = await sb.from("pagos_servicios_publicos").select("*").eq("id", id).maybeSingle();
-    return data ? mapPagoServicioRow(data as Record<string, unknown>) : null;
+    if (!data) return null;
+    const pago = mapPagoServicioRow(data as Record<string, unknown>);
+    const adjMap = await fetchAdjuntosPorEntidades("PAGO_SERVICIO_PUBLICO", [id]);
+    return { ...pago, ...pagoServicioConComprobantes(pago, adjMap) };
   },
   findByServicioContratoId: async (servicioId) => {
     const sb = requireSupabase();
@@ -161,7 +173,12 @@ export const supabasePagosServicioRepository: PagosServicioRepository = {
       .select("*")
       .eq("servicio_publico_contrato_id", servicioId);
     if (error) throw error;
-    return (data ?? []).map((r) => mapPagoServicioRow(r as Record<string, unknown>));
+    const rows = (data ?? []).map((r) => mapPagoServicioRow(r as Record<string, unknown>));
+    const adjMap = await fetchAdjuntosPorEntidades(
+      "PAGO_SERVICIO_PUBLICO",
+      rows.map((p) => p.id)
+    );
+    return rows.map((p) => ({ ...p, ...pagoServicioConComprobantes(p, adjMap) }));
   },
   create: async (input) => {
     const sb = requireSupabase();
@@ -184,7 +201,10 @@ export const supabasePagosServicioRepository: PagosServicioRepository = {
       .select()
       .maybeSingle();
     if (error) throw error;
-    return data ? mapPagoServicioRow(data as Record<string, unknown>) : null;
+    if (!data) return null;
+    const pago = mapPagoServicioRow(data as Record<string, unknown>);
+    const adjMap = await fetchAdjuntosPorEntidades("PAGO_SERVICIO_PUBLICO", [id]);
+    return { ...pago, ...pagoServicioConComprobantes(pago, adjMap) };
   },
   delete: async (id) => {
     const sb = requireSupabase();

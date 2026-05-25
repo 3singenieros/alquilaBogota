@@ -1,8 +1,10 @@
 "use server";
 
+import { isSupabaseMode } from "@/config/app-mode";
 import { eliminarArchivoAdjunto, subirArchivosPersistidos } from "@/services/adjuntos-persistencia.service";
 import { getSignedUrl, resolveArchivoUrl } from "@/services/file-storage.service";
 import { getFileRepository } from "@/repositories";
+import { fetchAdjuntosMantenimientoPorIds } from "@/repositories/supabase/supabase-adjuntos-entidad";
 import { requireSession } from "@/services/auth.service";
 import type { StorageBucketKey } from "@/lib/config";
 import type { ArchivoAdjunto } from "@/types";
@@ -77,4 +79,18 @@ export async function listarArchivosEntidadAction(
 ): Promise<ArchivoAdjunto[]> {
   await requireSession();
   return getFileRepository().findByEntidad(entidadTipo, entidadId);
+}
+
+export async function listarAdjuntosMantenimientoAction(mantenimientoId: string) {
+  await requireSession();
+  if (!isSupabaseMode()) {
+    return { evidenciasAdjuntas: [] as ArchivoAdjunto[], documentosCierreAdjuntos: [] as ArchivoAdjunto[] };
+  }
+  const map = await fetchAdjuntosMantenimientoPorIds([mantenimientoId]);
+  return (
+    map.get(mantenimientoId) ?? {
+      evidenciasAdjuntas: [],
+      documentosCierreAdjuntos: [],
+    }
+  );
 }

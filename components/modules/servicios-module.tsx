@@ -10,10 +10,12 @@ import {
   vincularComprobantesPagoServicioAction,
 } from "@/app/(dashboard)/servicios/actions";
 import { HistorialTimeline } from "@/components/trazabilidad/historial-timeline";
+import { listarArchivosEntidadAction } from "@/app/actions/file-storage.actions";
 import { VerAdjuntosButton } from "@/components/shared/adjuntos-panel";
+import { AttachmentsList } from "@/components/shared/attachments-list";
 import { MultiFileUploader } from "@/components/shared/multi-file-uploader";
 import type { CargadoPorAdjunto } from "@/lib/archivos-adjuntos";
-import { subirYVincularPostCreate } from "@/lib/adjuntos-client";
+import { esAdjuntoPendienteSubida, subirYVincularPostCreate } from "@/lib/adjuntos-client";
 import type { ArchivoAdjunto } from "@/types";
 import { FilterBar } from "@/components/shared/filter-bar";
 import { StatusBadge, estadoVariant } from "@/components/ui/badge";
@@ -37,9 +39,13 @@ import type {
   ServicioPublicoContrato,
 } from "@/types";
 import type { EventoTrazabilidad } from "@/types/trazabilidad";
-import { Check, Eye, History, X } from "lucide-react";
+import { Check, History, X } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useMemo, useState, useTransition } from "react";
+
+function pagoServicioTieneComprobantes(p: PagoServicioPublico) {
+  return (p.comprobantesAdjuntos?.length ?? 0) > 0;
+}
 
 const ESTADOS_PAGO: EstadoPagoServicioPublico[] = [
   "PENDIENTE",
@@ -78,6 +84,7 @@ export function ServiciosModule({
   };
   const [comprobantesReporte, setComprobantesReporte] = useState<ArchivoAdjunto[]>([]);
   const [pendingComprobantesReporte, setPendingComprobantesReporte] = useState<File[]>([]);
+  const [uploadError, setUploadError] = useState<string | null>(null);
   const canReview = rol === "ARRENDADOR" || rol === "ADMIN";
   const canReport = rol === "ARRENDATARIO" || rol === "ADMIN";
 
@@ -109,7 +116,6 @@ export function ServiciosModule({
   const [reportOpen, setReportOpen] = useState(false);
   const [validateOpen, setValidateOpen] = useState(false);
   const [rejectOpen, setRejectOpen] = useState(false);
-  const [comprobanteOpen, setComprobanteOpen] = useState(false);
   const [historialOpen, setHistorialOpen] = useState(false);
   const [servicioTarget, setServicioTarget] = useState<ServicioPublicoContrato | null>(null);
   const [pagoTarget, setPagoTarget] = useState<PagoConServicio | null>(null);
@@ -154,7 +160,9 @@ export function ServiciosModule({
     if (!servicioTarget) return;
     const fd = new FormData(e.currentTarget);
     startTransition(async () => {
-      const created = await reportarPagoServicioAction({
+      setUploadError(null);
+      let uploadErr: string | null = null;
+      let created = await reportarPagoServicioAction({
         servicioPublicoContratoId: servicioTarget.id,
         periodo: fd.get("periodo") as string,
         fechaPago: fd.get("fechaPago") as string,
@@ -163,19 +171,36 @@ export function ServiciosModule({
         fechaVencimiento: (fd.get("fechaVencimiento") as string) || undefined,
         observaciones: (fd.get("observaciones") as string) || undefined,
       });
+      const hayComprobantesPendientes =
+        pendingComprobantesReporte.length > 0 ||
+        comprobantesReporte.some(esAdjuntoPendienteSubida);
       if (created && pendingComprobantesReporte.length > 0) {
-        await subirYVincularPostCreate(
-          created.id,
-          pendingComprobantesReporte,
-          {
-            bucket: "servicios",
-            entidadTipo: "PAGO_SERVICIO_PUBLICO",
-            contratoId: servicioTarget.contratoId,
-            inmuebleId: servicioTarget.inmuebleId,
-          },
-          vincularComprobantesPagoServicioAction
-        );
+        try {
+          const updated = await subirYVincularPostCreate(
+            created.id,
+            pendingComprobantesReporte,
+            {
+              bucket: "servicios",
+              entidadTipo: "PAGO_SERVICIO_PUBLICO",
+              contratoId: servicioTarget.contratoId,
+              inmuebleId: servicioTarget.inmuebleId,
+            },
+            vincularComprobantesPagoServicioAction
+          );
+          if (updated && "code" in updated) {
+            created = { ...created, ...updated };
+          }
+        } catch (err) {
+          uploadErr =
+            err instanceof Error
+              ? err.message
+              : "No se pudieron subir los comprobantes a Storage.";
+        }
+      } else if (created && hayComprobantesPendientes) {
+        uploadErr =
+          "El reporte se guardó pero los comprobantes no se subieron. Vuelve a intentarlo.";
       }
+      if (uploadErr) setUploadError(uploadErr);
       if (created) {
         setPagosState((prev) => [
           ...prev,
@@ -184,9 +209,31 @@ export function ServiciosModule({
       }
       setComprobantesReporte([]);
       setPendingComprobantesReporte([]);
-      setReportOpen(false);
-      setServicioTarget(null);
+      if (!uploadErr) {
+        setReportOpen(false);
+        setServicioTarget(null);
+      }
     });
+  }
+
+  async function abrirValidacion(p: PagoConServicio) {
+    const docs = await listarArchivosEntidadAction("PAGO_SERVICIO_PUBLICO", p.id);
+    setPagoTarget({
+      ...p,
+      comprobantesAdjuntos: docs.length ? docs : p.comprobantesAdjuntos,
+    });
+    setObservaciones("");
+    setValidateOpen(true);
+  }
+
+  async function abrirRechazo(p: PagoConServicio) {
+    const docs = await listarArchivosEntidadAction("PAGO_SERVICIO_PUBLICO", p.id);
+    setPagoTarget({
+      ...p,
+      comprobantesAdjuntos: docs.length ? docs : p.comprobantesAdjuntos,
+    });
+    setMotivoRechazo("");
+    setRejectOpen(true);
   }
 
   function confirmarValidacion() {
@@ -305,6 +352,7 @@ export function ServiciosModule({
                     size="sm"
                     onClick={() => {
                       setServicioTarget(s);
+                      setUploadError(null);
                       setReportOpen(true);
                     }}
                   >
@@ -379,20 +427,19 @@ export function ServiciosModule({
                     )}
                   </Td>
                   <Td>
-                    {p.comprobanteUrl ? (
-                      <button
-                        type="button"
-                        className="text-xs text-indigo-600"
-                        onClick={() => {
-                          setPagoTarget(p);
-                          setComprobanteOpen(true);
-                        }}
-                      >
-                        Ver
-                      </button>
-                    ) : (
-                      "—"
-                    )}
+                    <VerAdjuntosButton
+                      titulo={`Comprobantes — ${p.code}`}
+                      entidadTipo="PAGO_SERVICIO_PUBLICO"
+                      entidadId={p.id}
+                      listas={[
+                        {
+                          etiqueta: "Comprobante de pago",
+                          archivos: p.comprobantesAdjuntos,
+                          entidadTipo: "PAGO_SERVICIO_PUBLICO",
+                          entidadId: p.id,
+                        },
+                      ]}
+                    />
                   </Td>
                   <Td className="text-right">
                     <div className="flex justify-end gap-1">
@@ -517,6 +564,9 @@ export function ServiciosModule({
             <FormField label="Observaciones">
               <Input name="observaciones" />
             </FormField>
+            {uploadError ? (
+              <p className="text-sm text-red-600">{uploadError}</p>
+            ) : null}
           </form>
         )}
       </Modal>
@@ -536,9 +586,37 @@ export function ServiciosModule({
           </>
         }
       >
-        <FormField label="Observaciones (opcional)">
-          <Input value={observaciones} onChange={(e) => setObservaciones(e.target.value)} />
-        </FormField>
+        {pagoTarget ? (
+          <div className="space-y-4 text-sm">
+            <p>
+              <span className="text-slate-500">Código:</span> {pagoTarget.code}
+            </p>
+            <p>
+              <span className="text-slate-500">Periodo:</span> {pagoTarget.periodo}
+            </p>
+            <p>
+              <span className="text-slate-500">Valor:</span>{" "}
+              {formatCurrency(pagoTarget.valorPagado)}
+            </p>
+            <FormField label="Observaciones (opcional)">
+              <Input value={observaciones} onChange={(e) => setObservaciones(e.target.value)} />
+            </FormField>
+            {pagoServicioTieneComprobantes(pagoTarget) ? (
+              <div>
+                <p className="mb-2 text-xs font-medium text-slate-600">
+                  Comprobantes reportados
+                </p>
+                <AttachmentsList
+                  archivos={pagoTarget.comprobantesAdjuntos ?? []}
+                  entidadTipo="PAGO_SERVICIO_PUBLICO"
+                  entidadId={pagoTarget.id}
+                />
+              </div>
+            ) : (
+              <p className="text-xs text-amber-700">Sin comprobantes adjuntos.</p>
+            )}
+          </div>
+        ) : null}
       </Modal>
 
       <Modal
@@ -560,25 +638,32 @@ export function ServiciosModule({
           </>
         }
       >
-        <FormField label="Motivo obligatorio">
-          <Input value={motivoRechazo} onChange={(e) => setMotivoRechazo(e.target.value)} />
-        </FormField>
-      </Modal>
-
-      <Modal
-        open={comprobanteOpen}
-        onClose={() => setComprobanteOpen(false)}
-        title="Comprobante"
-        footer={
-          <Button variant="secondary" onClick={() => setComprobanteOpen(false)}>
-            Cerrar
-          </Button>
-        }
-      >
-        <p className="font-mono text-sm">{pagoTarget?.comprobanteUrl}</p>
-        <p className="mt-2 flex items-center gap-1 text-xs text-slate-500">
-          <Eye className="h-3 w-3" /> Archivo simulado
-        </p>
+        {pagoTarget ? (
+          <div className="space-y-4 text-sm">
+            <p>
+              <span className="text-slate-500">Código:</span> {pagoTarget.code}
+            </p>
+            <FormField label="Motivo obligatorio">
+              <Input value={motivoRechazo} onChange={(e) => setMotivoRechazo(e.target.value)} />
+            </FormField>
+            {pagoServicioTieneComprobantes(pagoTarget) ? (
+              <div>
+                <p className="mb-2 text-xs font-medium text-slate-600">Comprobantes</p>
+                <AttachmentsList
+                  archivos={pagoTarget.comprobantesAdjuntos ?? []}
+                  entidadTipo="PAGO_SERVICIO_PUBLICO"
+                  entidadId={pagoTarget.id}
+                />
+              </div>
+            ) : (
+              <p className="text-xs text-amber-700">Sin comprobantes adjuntos.</p>
+            )}
+          </div>
+        ) : (
+          <FormField label="Motivo obligatorio">
+            <Input value={motivoRechazo} onChange={(e) => setMotivoRechazo(e.target.value)} />
+          </FormField>
+        )}
       </Modal>
 
       <Modal

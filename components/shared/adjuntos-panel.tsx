@@ -1,6 +1,9 @@
 "use client";
 
-import { listarArchivosEntidadAction } from "@/app/actions/file-storage.actions";
+import {
+  listarAdjuntosMantenimientoAction,
+  listarArchivosEntidadAction,
+} from "@/app/actions/file-storage.actions";
 import { AttachmentsList } from "@/components/shared/attachments-list";
 import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
@@ -33,6 +36,8 @@ export function VerAdjuntosButton({
     archivos?: ArchivoAdjunto[];
     entidadTipo?: EntidadTipoTrazabilidad;
     entidadId?: string;
+    /** Solo mantenimiento: EVIDENCIA | CIERRE */
+    tipoDocumento?: string;
   }[];
   entidadTipo?: EntidadTipoTrazabilidad;
   entidadId?: string;
@@ -74,17 +79,42 @@ export function VerAdjuntosButton({
     setLoading(true);
     setFetched(false);
     try {
-      const updated = await Promise.all(
-        listas.map(async (grupo) => {
+      const mntId =
+        entidadId ?? listas.find((g) => g.entidadTipo === "MANTENIMIENTO")?.entidadId;
+      const usaSplitMantenimiento =
+        Boolean(mntId) &&
+        listas.some((g) => g.tipoDocumento && (g.entidadTipo ?? entidadTipo) === "MANTENIMIENTO");
+
+      let updated = listas;
+      if (usaSplitMantenimiento && mntId) {
+        const split = await listarAdjuntosMantenimientoAction(mntId);
+        updated = listas.map((grupo) => {
           const tipo = grupo.entidadTipo ?? entidadTipo;
-          const id = grupo.entidadId ?? entidadId;
-          if (tipo && id) {
-            const archivos = await listarArchivosEntidadAction(tipo, id);
-            return { ...grupo, archivos, entidadTipo: tipo, entidadId: id };
-          }
-          return grupo;
-        })
-      );
+          const id = grupo.entidadId ?? entidadId ?? mntId;
+          const archivos =
+            grupo.tipoDocumento === "CIERRE"
+              ? split.documentosCierreAdjuntos
+              : grupo.tipoDocumento === "EVIDENCIA"
+                ? split.evidenciasAdjuntas
+                : [
+                    ...split.evidenciasAdjuntas,
+                    ...split.documentosCierreAdjuntos,
+                  ];
+          return { ...grupo, archivos, entidadTipo: tipo, entidadId: id };
+        });
+      } else {
+        updated = await Promise.all(
+          listas.map(async (grupo) => {
+            const tipo = grupo.entidadTipo ?? entidadTipo;
+            const id = grupo.entidadId ?? entidadId;
+            if (tipo && id) {
+              const archivos = await listarArchivosEntidadAction(tipo, id);
+              return { ...grupo, archivos, entidadTipo: tipo, entidadId: id };
+            }
+            return grupo;
+          })
+        );
+      }
       setLocalListas(updated);
       setFetched(true);
     } finally {
