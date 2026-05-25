@@ -1,0 +1,60 @@
+%% Diagrama de componentes — AlquilaBogotá MVP
+
+flowchart TB
+    subgraph Cliente["Cliente"]
+        Browser["Navegador web"]
+    end
+
+    subgraph NextJS["Next.js App Router"]
+        Pages["app/(dashboard)/* pages"]
+        Actions["Server Actions<br/>app/**/actions.ts"]
+        API["API Route<br/>/api/e2e/login"]
+        MW["middleware.ts"]
+        Components["components/<br/>modules, shared, ui, pdf"]
+    end
+
+    subgraph Logica["Capa de negocio"]
+        Services["services/*.service.ts"]
+        Access["access-control.service"]
+        Audit["lib/audit/*"]
+    end
+
+    subgraph Datos["Capa de datos"]
+        RepoIndex["repositories/index.ts"]
+        Mock["data/mock + repos mock"]
+        SupaRepo["repositories/supabase/*"]
+    end
+
+    subgraph Externos["Servicios externos"]
+        Firebase["Firebase Authentication"]
+        PG["Supabase PostgreSQL"]
+        Storage["Supabase Storage"]
+    end
+
+    subgraph Calidad["Pruebas y reportes"]
+        PW["Playwright E2E<br/>tests/e2e"]
+        ReactPDF["@react-pdf/renderer<br/>PDF reportes y soportes"]
+    end
+
+    Browser --> Pages
+    Browser --> Components
+    MW --> Pages
+    Pages --> Actions
+    Pages --> Components
+    Components --> Actions
+    Actions --> Services
+    API --> Services
+    Services --> Access
+    Services --> Audit
+    Services --> RepoIndex
+    RepoIndex --> Mock
+    RepoIndex --> SupaRepo
+    SupaRepo --> PG
+    Services --> Storage
+    Browser --> Firebase
+    Services --> Firebase
+    PW --> Browser
+    Components --> ReactPDF
+
+    classDef ext fill:#e0e7ff,stroke:#4338ca
+    class Firebase,PG,Storage ext

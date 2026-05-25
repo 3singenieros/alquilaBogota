@@ -1,0 +1,178 @@
+%% Diagrama de clases — dominio AlquilaBogotá MVP
+%% Fuente: types/index.ts, types/trazabilidad.ts, types/reportes.ts, types/soporte-pago.ts
+
+classDiagram
+    direction TB
+
+    class Usuario {
+        +string id
+        +string code
+        +string nombre
+        +string email
+        +Rol rol
+        +Rol[] roles
+        +Rol rolActivo
+        +boolean perfilCompletado
+        +string firebaseUid
+    }
+
+    class Profile {
+        +string id
+        +string firebaseUid
+        +Rol[] roles
+        +Rol rolActivo
+        +boolean perfilCompletado
+    }
+
+    class Inmueble {
+        +string id
+        +string code
+        +string titulo
+        +string direccion
+        +EstadoInmueble estado
+        +number canonMensual
+        +string arrendadorId
+    }
+
+    class Contrato {
+        +string id
+        +string code
+        +string inmuebleId
+        +string arrendadorId
+        +string arrendatarioId
+        +string emailArrendatario
+        +EstadoContrato estado
+        +number canonActual
+        +boolean noRenovar
+    }
+
+    class InvitacionContrato {
+        +string id
+        +string contratoId
+        +string emailInvitado
+        +EstadoInvitacionContrato estado
+        +string tokenInvitacion
+    }
+
+    class ServicioPublicoContrato {
+        +string id
+        +string contratoId
+        +string inmuebleId
+        +TipoServicioPublico tipoServicio
+        +boolean activo
+    }
+
+    class PagoReportado {
+        +string id
+        +string code
+        +string contratoId
+        +string mes
+        +number monto
+        +EstadoPago estado
+        +string reportadoPorId
+    }
+
+    class PagoServicioPublico {
+        +string id
+        +string servicioPublicoContratoId
+        +string contratoId
+        +EstadoPagoServicioPublico estado
+        +number valorPagado
+    }
+
+    class SoportePago {
+        +string id
+        +string pagoId
+        +string contratoId
+        +string numeroSoporte
+        +number monto
+    }
+
+    class Mantenimiento {
+        +string id
+        +string inmuebleId
+        +EstadoMantenimiento estado
+        +string solicitadoPorId
+        +TipoResponsabilidadMantenimiento tipoResponsabilidad
+    }
+
+    class ComentarioMantenimiento {
+        +string id
+        +string mantenimientoId
+        +string usuarioId
+        +string comentario
+    }
+
+    class NoRenovacion {
+        +string id
+        +string contratoId
+        +string inmuebleId
+        +EstadoNoRenovacion estado
+        +EstadoEnvioNoRenovacion estadoEnvio
+    }
+
+    class Notificacion {
+        +string id
+        +TipoNotificacion tipo
+        +string contratoId
+        +EstadoNotificacion estado
+        +string destinatarioEmail
+    }
+
+    class EventoTrazabilidad {
+        +string id
+        +EntidadTipoTrazabilidad entidadTipo
+        +string entidadId
+        +AccionTrazabilidad accion
+        +string usuarioId
+        +datetime fechaHora
+    }
+
+    class ArchivoAdjunto {
+        +string id
+        +string nombre
+        +string bucket
+        +string path
+        +string entidadTipo
+        +string entidadId
+    }
+
+    class ReporteDocumento {
+        +TipoReporte tipo
+        +string titulo
+        +ReporteSeccion[] secciones
+        +EventoTrazabilidad[] eventosTrazabilidad
+    }
+
+    Usuario "1" --> "*" Inmueble : arrenda
+    Usuario "1" --> "*" Contrato : arrendador
+    Usuario "1" --> "*" Contrato : arrendatario
+    Profile ..> Usuario : sincroniza
+
+    Inmueble "1" --> "*" Contrato : tiene
+    Inmueble "1" --> "*" Mantenimiento : recibe
+
+    Contrato "1" --> "*" InvitacionContrato : invita
+    Contrato "1" --> "*" PagoReportado : pagos canon
+    Contrato "1" --> "*" ServicioPublicoContrato : servicios
+    Contrato "1" --> "0..1" NoRenovacion : expediente
+    Contrato "1" --> "*" Notificacion : alertas
+
+    ServicioPublicoContrato "1" --> "*" PagoServicioPublico : pagos periodo
+
+    PagoReportado "1" --> "0..1" SoportePago : genera
+
+    Mantenimiento "1" --> "*" ComentarioMantenimiento : comentarios
+
+    ArchivoAdjunto "*" --> "1" Contrato : documentos
+    ArchivoAdjunto "*" --> "1" PagoReportado : comprobantes
+    ArchivoAdjunto "*" --> "1" PagoServicioPublico : comprobantes
+    ArchivoAdjunto "*" --> "1" Mantenimiento : evidencias
+    ArchivoAdjunto "*" --> "1" NoRenovacion : expediente
+
+    EventoTrazabilidad "*" --> "0..1" Contrato : contexto
+    EventoTrazabilidad "*" --> "0..1" Inmueble : contexto
+    EventoTrazabilidad "*" --> Usuario : actor
+
+    ReporteDocumento ..> Contrato : agrega datos
+    ReporteDocumento ..> EventoTrazabilidad : incluye

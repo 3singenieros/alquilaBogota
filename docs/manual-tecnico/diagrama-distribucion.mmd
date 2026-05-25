@@ -1,0 +1,36 @@
+%% Diagrama de distribución / despliegue
+
+flowchart TB
+    subgraph Usuario["Entorno usuario"]
+        Browser["Navegador<br/>Chrome / Edge / Firefox"]
+    end
+
+    subgraph Hosting["Hosting aplicación"]
+        Vercel["Vercel / servidor Node.js<br/>next start o npm run dev"]
+        NextApp["Aplicación Next.js 15+<br/>arrendamientos-mvp"]
+    end
+
+    subgraph Google["Google Cloud"]
+        FirebaseAuth["Firebase Authentication<br/>identidad OAuth/email"]
+    end
+
+    subgraph SupabaseCloud["Supabase Cloud"]
+        PG["PostgreSQL<br/>esquema relacional"]
+        ObjStorage["Object Storage<br/>buckets: contratos, pagos, servicios,<br/>mantenimiento, no-renovacion, evidencias"]
+    end
+
+    subgraph DevOps["Desarrollo"]
+        GitHub["Repositorio GitHub<br/>3singenieros/alquilaBogota"]
+        CI["CI local / laptop<br/>Playwright + MOCK"]
+    end
+
+    Browser -->|HTTPS| Vercel
+    Vercel --> NextApp
+    NextApp -->|SDK Auth| FirebaseAuth
+    NextApp -->|Supabase JS| PG
+    NextApp -->|Storage API| ObjStorage
+    GitHub -->|git clone / push| Vercel
+    CI -->|test:e2e localhost:3000| NextApp
+
+    note1["Modo MOCK: datos en memoria<br/>sin PG obligatorio"]
+    NextApp -.-> note1
