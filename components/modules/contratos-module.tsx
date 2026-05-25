@@ -233,6 +233,7 @@ export function ContratosModule({
   return (
     <>
       <PageHeader
+        pageTestId="page-contratos"
         title="Contratos"
         description="Trazabilidad contractual — codeudor, depósito, preaviso y reajuste de canon"
         action={

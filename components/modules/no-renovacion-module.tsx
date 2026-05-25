@@ -314,6 +314,7 @@ export function NoRenovacionModule({
   return (
     <>
       <PageHeader
+        pageTestId="page-no-renovacion"
         title="No renovación"
         description="Comunicación formal unilateral con expediente documental y evidencia de envío"
         action={

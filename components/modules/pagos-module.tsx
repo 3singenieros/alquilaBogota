@@ -245,6 +245,7 @@ export function PagosModule({
   return (
     <>
       <PageHeader
+        pageTestId="page-pagos"
         title="Pagos reportados"
         description="El arrendatario reporta pagos; el arrendador valida o rechaza y genera soporte PDF"
         action={

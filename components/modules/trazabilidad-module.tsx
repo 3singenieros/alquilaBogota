@@ -90,6 +90,7 @@ export function TrazabilidadModule({
   return (
     <>
       <PageHeader
+        pageTestId="page-trazabilidad"
         title="Trazabilidad"
         description="Bitácora de eventos y cambios de estado — preparada para reportes por contrato o inmueble"
       />

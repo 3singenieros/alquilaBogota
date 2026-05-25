@@ -99,6 +99,7 @@ export function ReportesModule({
   return (
     <>
       <PageHeader
+        pageTestId="page-reportes"
         title="Reportes"
         description="Evidencia documental y trazable — vista previa y descarga PDF"
       />

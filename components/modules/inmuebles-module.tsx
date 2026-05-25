@@ -111,6 +111,7 @@ export function InmueblesModule({
   return (
     <>
       <PageHeader
+        pageTestId="page-inmuebles"
         title="Inmuebles"
         description="Gestión de propiedades en arrendamiento activo — alcance Bogotá D.C."
         action={

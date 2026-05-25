@@ -321,6 +321,7 @@ export function MantenimientoModule({
   return (
     <>
       <PageHeader
+        pageTestId="page-mantenimiento"
         title="Mantenimiento"
         description={
           rol === "ARRENDATARIO"

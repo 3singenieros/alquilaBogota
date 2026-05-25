@@ -130,6 +130,7 @@ export function VerAdjuntosButton({
         size="sm"
         className="text-indigo-600"
         disabled={loading}
+        data-testid="ver-adjuntos-button"
         onClick={() => void handleOpen()}
       >
         {loading ? (
@@ -144,7 +145,11 @@ export function VerAdjuntosButton({
         onClose={() => setOpen(false)}
         title={titulo}
         footer={
-          <Button variant="secondary" onClick={() => setOpen(false)}>
+          <Button
+            variant="secondary"
+            data-testid="document-viewer-close"
+            onClick={() => setOpen(false)}
+          >
             Cerrar
           </Button>
         }

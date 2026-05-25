@@ -43,7 +43,10 @@ export function DocumentViewer({
 }) {
   if (!url) {
     return (
-      <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+      <div
+        data-testid="document-viewer"
+        className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800"
+      >
         No se pudo obtener la URL del archivo. Verifique Storage y permisos.
       </div>
     );
@@ -52,6 +55,7 @@ export function DocumentViewer({
   if (isPdf(archivo.tipo, archivo.nombre)) {
     return (
       <iframe
+        data-testid="document-viewer"
         title={archivo.nombre}
         src={url}
         className="h-[70vh] w-full rounded-lg border border-[var(--border)] bg-white"

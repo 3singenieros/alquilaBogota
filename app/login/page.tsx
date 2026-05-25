@@ -15,7 +15,10 @@ export default async function LoginPage({
   await redirectIfAuthenticated(nextPath);
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[var(--background)] px-4">
+    <div
+      data-testid="page-login"
+      className="flex min-h-screen items-center justify-center bg-[var(--background)] px-4"
+    >
       <LoginForm nextPath={nextPath} />
     </div>
   );

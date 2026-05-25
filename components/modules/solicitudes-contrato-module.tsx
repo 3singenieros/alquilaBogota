@@ -77,6 +77,7 @@ export function SolicitudesContratoModule({
   return (
     <>
       <PageHeader
+        pageTestId="page-solicitudes-contrato"
         title="Solicitudes de contrato"
         description="Invitaciones enviadas a tu correo — acepta o rechaza para confirmar el arrendamiento"
       />

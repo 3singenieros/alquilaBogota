@@ -279,6 +279,7 @@ export function ServiciosModule({
   return (
     <>
       <PageHeader
+        pageTestId="page-servicios"
         title="Servicios públicos"
         description="Pagos periódicos de servicios configurados en el contrato (distinto del canon de arrendamiento)"
         action={
