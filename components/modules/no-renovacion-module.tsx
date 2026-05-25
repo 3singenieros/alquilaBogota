@@ -813,6 +813,17 @@ export function NoRenovacionModule({
               onChange={setEvidencias}
               cargadoPor={cargadoPor}
               disabled={!!soloLectura}
+              uploadContext={
+                expediente
+                  ? {
+                      bucket: "noRenovacion",
+                      entidadTipo: "NO_RENOVACION",
+                      entidadId: expediente.id,
+                      contratoId: expediente.contratoId,
+                      inmuebleId: expediente.inmuebleId,
+                    }
+                  : undefined
+              }
             />
             {expediente?.estado === "ENVIO_REGISTRADO" && (
               <p className="text-sm text-emerald-700">

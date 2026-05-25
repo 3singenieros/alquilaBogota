@@ -33,3 +33,28 @@ export async function traceAdjuntosAgregados(
     ),
   });
 }
+
+export async function traceAdjuntosEliminados(
+  actor: AuditActor,
+  input: {
+    entidadTipo: EntidadTipoTrazabilidad;
+    entidadId: string;
+    adjuntos: ArchivoAdjunto[];
+    descripcion: string;
+    contexto?: Partial<ContextoTrazabilidad>;
+  }
+) {
+  if (input.adjuntos.length === 0) return;
+  await traceEvento(actor, {
+    entidadTipo: input.entidadTipo,
+    entidadId: input.entidadId,
+    accion: "DOCUMENTO_ELIMINADO",
+    descripcion: input.descripcion,
+    contexto: input.contexto,
+    metadata: metadataAdjuntosTrazabilidad(
+      input.adjuntos,
+      input.entidadTipo,
+      input.entidadId
+    ),
+  });
+}

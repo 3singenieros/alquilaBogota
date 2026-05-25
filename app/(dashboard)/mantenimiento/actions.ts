@@ -7,6 +7,7 @@ import {
   crearMantenimiento,
   eliminarMantenimiento,
   listarInmueblesParaMantenimiento,
+  vincularEvidenciasMantenimiento,
 } from "@/services/mantenimiento.service";
 import {
   cerrarMantenimientoTicket,
@@ -31,6 +32,16 @@ export async function crearMantenimientoAction(data: CreateInput<Mantenimiento>)
   revalidatePath("/mantenimiento");
   revalidatePath("/");
   return created;
+}
+
+export async function vincularEvidenciasMantenimientoAction(
+  id: string,
+  adjuntos: ArchivoAdjunto[],
+  campo: "evidenciasAdjuntas" | "documentosCierreAdjuntos" = "evidenciasAdjuntas"
+) {
+  const updated = await vincularEvidenciasMantenimiento(id, adjuntos, campo);
+  revalidatePath("/mantenimiento");
+  return updated;
 }
 
 export async function actualizarContenidoMantenimientoAction(

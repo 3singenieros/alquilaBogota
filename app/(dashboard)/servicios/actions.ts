@@ -5,6 +5,7 @@ import {
   rechazarPagoServicio,
   reportarPagoServicio,
   validarPagoServicio,
+  vincularComprobantesPagoServicio,
 } from "@/services/pagos-servicio.service";
 import { listarServiciosContrato } from "@/services/servicios-contrato.service";
 import type { ArchivoAdjunto } from "@/types";
@@ -28,6 +29,15 @@ export async function reportarPagoServicioAction(input: {
   revalidatePath("/servicios");
   revalidatePath("/");
   return created;
+}
+
+export async function vincularComprobantesPagoServicioAction(
+  pagoId: string,
+  adjuntos: ArchivoAdjunto[]
+) {
+  const updated = await vincularComprobantesPagoServicio(pagoId, adjuntos);
+  revalidatePath("/servicios");
+  return updated;
 }
 
 export async function validarPagoServicioAction(id: string, observaciones?: string) {

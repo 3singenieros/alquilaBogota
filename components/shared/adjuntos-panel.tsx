@@ -1,19 +1,13 @@
 "use client";
 
+import { AttachmentsList } from "@/components/shared/attachments-list";
 import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
 import { totalAdjuntos } from "@/lib/archivos-adjuntos";
-import { formatDate } from "@/lib/utils";
 import type { ArchivoAdjunto } from "@/types";
+import type { EntidadTipoTrazabilidad } from "@/types/trazabilidad";
 import { Paperclip } from "lucide-react";
 import { useState } from "react";
-
-function formatBytes(size?: number): string {
-  if (size === undefined) return "—";
-  if (size < 1024) return `${size} B`;
-  if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`;
-  return `${(size / (1024 * 1024)).toFixed(1)} MB`;
-}
 
 export function AdjuntosCount({
   listas,
@@ -28,15 +22,37 @@ export function AdjuntosCount({
 export function VerAdjuntosButton({
   titulo = "Documentos adjuntos",
   listas,
+  entidadTipo,
+  entidadId,
+  canDelete = false,
 }: {
   titulo?: string;
-  listas: { etiqueta: string; archivos?: ArchivoAdjunto[] }[];
+  listas: {
+    etiqueta: string;
+    archivos?: ArchivoAdjunto[];
+    entidadTipo?: EntidadTipoTrazabilidad;
+    entidadId?: string;
+  }[];
+  entidadTipo?: EntidadTipoTrazabilidad;
+  entidadId?: string;
+  canDelete?: boolean;
 }) {
   const [open, setOpen] = useState(false);
-  const total = listas.reduce((s, l) => s + (l.archivos?.length ?? 0), 0);
+  const [localListas, setLocalListas] = useState(listas);
+  const total = localListas.reduce((s, l) => s + (l.archivos?.length ?? 0), 0);
 
   if (total === 0) {
     return <span className="text-xs text-slate-400">Sin adjuntos</span>;
+  }
+
+  function handleDeleted(grupoIdx: number, id: string) {
+    setLocalListas((prev) =>
+      prev.map((g, i) =>
+        i === grupoIdx
+          ? { ...g, archivos: g.archivos?.filter((a) => a.id !== id) }
+          : g
+      )
+    );
   }
 
   return (
@@ -46,7 +62,10 @@ export function VerAdjuntosButton({
         variant="ghost"
         size="sm"
         className="text-indigo-600"
-        onClick={() => setOpen(true)}
+        onClick={() => {
+          setLocalListas(listas);
+          setOpen(true);
+        }}
       >
         <Paperclip className="mr-1 h-3.5 w-3.5" />
         Ver adjuntos ({total})
@@ -62,37 +81,20 @@ export function VerAdjuntosButton({
         }
       >
         <div className="space-y-4">
-          {listas.map(
-            (grupo) =>
+          {localListas.map(
+            (grupo, idx) =>
               (grupo.archivos?.length ?? 0) > 0 && (
                 <div key={grupo.etiqueta}>
                   <h4 className="mb-2 text-sm font-medium text-slate-700">
                     {grupo.etiqueta}
                   </h4>
-                  <ul className="space-y-2">
-                    {grupo.archivos!.map((a) => (
-                      <li
-                        key={a.id}
-                        className="rounded-lg border border-[var(--border)] bg-slate-50 p-3 text-sm"
-                      >
-                        <p className="font-medium text-slate-800">{a.nombre}</p>
-                        <p className="text-xs text-slate-500">
-                          {formatDate(a.fechaCarga.slice(0, 10))} · {formatBytes(a.tamano)}
-                          {a.cargadoPorNombre
-                            ? ` · ${a.cargadoPorNombre} (${a.cargadoPorRol})`
-                            : ""}
-                        </p>
-                        {a.descripcion && (
-                          <p className="mt-1 text-xs text-slate-600">{a.descripcion}</p>
-                        )}
-                        {a.urlSimulada && (
-                          <p className="mt-1 font-mono text-xs text-slate-400">
-                            {a.urlSimulada}
-                          </p>
-                        )}
-                      </li>
-                    ))}
-                  </ul>
+                  <AttachmentsList
+                    archivos={grupo.archivos ?? []}
+                    entidadTipo={grupo.entidadTipo ?? entidadTipo}
+                    entidadId={grupo.entidadId ?? entidadId}
+                    canDelete={canDelete}
+                    onDeleted={(id) => handleDeleted(idx, id)}
+                  />
                 </div>
               )
           )}

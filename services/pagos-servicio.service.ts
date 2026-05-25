@@ -23,7 +23,7 @@ import {
 import { assertModuleAccess, requireSession } from "@/services/auth.service";
 import { registrarNotificacion } from "@/services/notificaciones.service";
 import type { CreateInput, PagoServicioPublico } from "@/types";
-import { prepararComprobantes } from "@/lib/archivos-adjuntos";
+import { debeRegistrarTrazabilidadAdjuntos, prepararComprobantes } from "@/lib/archivos-adjuntos";
 import { traceAdjuntosAgregados } from "@/lib/audit/trace-adjuntos";
 import { formatCurrency } from "@/lib/utils";
 import type { ArchivoAdjunto } from "@/types";
@@ -211,7 +211,7 @@ export async function reportarPagoServicio(input: {
     metadata: { servicioPublicoContratoId: servicio.id },
   });
 
-  if (comprobantesAdjuntos.length > 0) {
+  if (comprobantesAdjuntos.length > 0 && debeRegistrarTrazabilidadAdjuntos(comprobantesAdjuntos)) {
     await traceAdjuntosAgregados(actor, {
       entidadTipo: "PAGO_SERVICIO_PUBLICO",
       entidadId: created.id,
@@ -222,6 +222,34 @@ export async function reportarPagoServicio(input: {
   }
 
   return created;
+}
+
+export async function vincularComprobantesPagoServicio(
+  pagoId: string,
+  adjuntos: ArchivoAdjunto[]
+) {
+  const { usuario } = await requireSession();
+  const pago = await getPagosServicioRepository().findById(pagoId);
+  if (!pago) throw new AuthError("Pago no encontrado", "FORBIDDEN");
+  const contrato = await getContratosRepository().findById(pago.contratoId);
+  if (!contrato || !canAccessContrato(contrato, usuario)) {
+    throw new AuthError("Contrato no permitido", "FORBIDDEN");
+  }
+  const rol = rolEfectivo(usuario);
+  const puede =
+    rol === "ADMIN" ||
+    rol === "ARRENDADOR" ||
+    (rol === "ARRENDATARIO" &&
+      pago.reportadoPorId === usuario.id &&
+      pago.estado === "REPORTADO");
+  if (!puede) {
+    throw new AuthError("Sin permiso para adjuntar comprobantes", "FORBIDDEN");
+  }
+  const { comprobantesAdjuntos, comprobanteUrl } = prepararComprobantes(adjuntos);
+  return getPagosServicioRepository().update(pagoId, {
+    comprobantesAdjuntos,
+    comprobanteUrl,
+  });
 }
 
 export async function validarPagoServicio(id: string, observaciones?: string) {

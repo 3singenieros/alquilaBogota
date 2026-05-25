@@ -269,6 +269,14 @@ export function MantenimientoModalsEconomicos({
                 value={docsCierre}
                 onChange={setDocsCierre}
                 cargadoPor={cargadoPor}
+                uploadContext={{
+                  bucket: "mantenimiento",
+                  entidadTipo: "MANTENIMIENTO",
+                  entidadId: selected.id,
+                  inmuebleId: selected.inmuebleId,
+                  linkMantenimientoId: selected.id,
+                  linkMantenimientoTipo: "CIERRE",
+                }}
               />
             )}
           </form>

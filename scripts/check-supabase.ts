@@ -4,7 +4,7 @@
  */
 import { config } from "dotenv";
 import { resolve } from "node:path";
-import { createClient } from "@supabase/supabase-js";
+import { createSupabaseCliClient } from "./supabase-cli-client";
 import {
   getSupabaseAnonKey,
   hasRestV1InSupabaseUrl,
@@ -61,7 +61,7 @@ async function main() {
     );
   }
 
-  const supabase = createClient(url, key);
+  const supabase = createSupabaseCliClient(url, key);
   const { data, error } = await supabase.from("usuarios").select("id").limit(1);
 
   if (error) {

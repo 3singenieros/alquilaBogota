@@ -29,7 +29,7 @@ import { syncUsuarioFromProfile } from "@/services/usuario-sync.service";
 import { registrarNotificacion } from "@/services/notificaciones.service";
 import { listarInmueblesReferencia } from "@/services/inmuebles.service";
 import { crearNotificacionReajusteCanon } from "@/services/notificaciones.service";
-import { prepararDocumentosContrato } from "@/lib/archivos-adjuntos";
+import { debeRegistrarTrazabilidadAdjuntos, prepararDocumentosContrato } from "@/lib/archivos-adjuntos";
 import { traceAdjuntosAgregados } from "@/lib/audit/trace-adjuntos";
 import type { Contrato, CreateInput, EstadoContrato, UpdateInput } from "@/types";
 
@@ -171,7 +171,7 @@ export async function crearContrato(data: CreateInput<Contrato>) {
     metadata: { emailInvitado: emailArrendatario },
   });
 
-  if (docs.documentosAdjuntos.length > 0) {
+  if (docs.documentosAdjuntos.length > 0 && debeRegistrarTrazabilidadAdjuntos(docs.documentosAdjuntos)) {
     await traceAdjuntosAgregados(actor, {
       entidadTipo: "CONTRATO",
       entidadId: contrato.id,
@@ -251,7 +251,15 @@ export async function actualizarContrato(id: string, data: UpdateInput<Contrato>
   if (finalEstado === "CONFIRMADO" || finalEstado === "PENDIENTE_CONFIRMACION") {
     await assertUnSoloContratoActivoPorInmueble(finalInmuebleId, finalEstado, id);
   }
-  const updated = await getContratosRepository().update(id, data);
+  let payload = data;
+  if (data.documentosAdjuntos !== undefined || data.documentoUrl !== undefined) {
+    const docs = prepararDocumentosContrato(
+      data.documentosAdjuntos ?? existing.documentosAdjuntos,
+      data.documentoUrl ?? existing.documentoUrl
+    );
+    payload = { ...data, ...docs };
+  }
+  const updated = await getContratosRepository().update(id, payload);
   if (updated) {
     const actor = auditActorFromUsuario(usuario);
     const ctx = await contextoDesdeContrato(id);

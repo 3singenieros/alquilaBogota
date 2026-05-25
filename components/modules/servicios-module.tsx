@@ -7,11 +7,13 @@ import {
   rechazarPagoServicioAction,
   reportarPagoServicioAction,
   validarPagoServicioAction,
+  vincularComprobantesPagoServicioAction,
 } from "@/app/(dashboard)/servicios/actions";
 import { HistorialTimeline } from "@/components/trazabilidad/historial-timeline";
 import { VerAdjuntosButton } from "@/components/shared/adjuntos-panel";
 import { MultiFileUploader } from "@/components/shared/multi-file-uploader";
 import type { CargadoPorAdjunto } from "@/lib/archivos-adjuntos";
+import { subirYVincularPostCreate } from "@/lib/adjuntos-client";
 import type { ArchivoAdjunto } from "@/types";
 import { FilterBar } from "@/components/shared/filter-bar";
 import { StatusBadge, estadoVariant } from "@/components/ui/badge";
@@ -75,6 +77,7 @@ export function ServiciosModule({
     rol,
   };
   const [comprobantesReporte, setComprobantesReporte] = useState<ArchivoAdjunto[]>([]);
+  const [pendingComprobantesReporte, setPendingComprobantesReporte] = useState<File[]>([]);
   const canReview = rol === "ARRENDADOR" || rol === "ADMIN";
   const canReport = rol === "ARRENDATARIO" || rol === "ADMIN";
 
@@ -156,10 +159,23 @@ export function ServiciosModule({
         periodo: fd.get("periodo") as string,
         fechaPago: fd.get("fechaPago") as string,
         valorPagado: Number(fd.get("valorPagado")),
-        comprobantesAdjuntos: comprobantesReporte,
+        comprobantesAdjuntos: [],
         fechaVencimiento: (fd.get("fechaVencimiento") as string) || undefined,
         observaciones: (fd.get("observaciones") as string) || undefined,
       });
+      if (created && pendingComprobantesReporte.length > 0) {
+        await subirYVincularPostCreate(
+          created.id,
+          pendingComprobantesReporte,
+          {
+            bucket: "servicios",
+            entidadTipo: "PAGO_SERVICIO_PUBLICO",
+            contratoId: servicioTarget.contratoId,
+            inmuebleId: servicioTarget.inmuebleId,
+          },
+          vincularComprobantesPagoServicioAction
+        );
+      }
       if (created) {
         setPagosState((prev) => [
           ...prev,
@@ -167,6 +183,7 @@ export function ServiciosModule({
         ]);
       }
       setComprobantesReporte([]);
+      setPendingComprobantesReporte([]);
       setReportOpen(false);
       setServicioTarget(null);
     });
@@ -494,6 +511,7 @@ export function ServiciosModule({
                 value={comprobantesReporte}
                 onChange={setComprobantesReporte}
                 cargadoPor={cargadoPor}
+                onPendingFilesChange={setPendingComprobantesReporte}
               />
             </FormField>
             <FormField label="Observaciones">

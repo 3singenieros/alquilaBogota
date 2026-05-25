@@ -6,6 +6,7 @@ import {
   cambiarEstadoMantenimientoAction,
   crearMantenimientoAction,
   listarInmueblesMantenimientoFormAction,
+  vincularEvidenciasMantenimientoAction,
 } from "@/app/(dashboard)/mantenimiento/actions";
 import { listarHistorialMantenimientoAction } from "@/app/(dashboard)/trazabilidad/actions";
 import { HistorialTimeline } from "@/components/trazabilidad/historial-timeline";
@@ -13,6 +14,7 @@ import { VerAdjuntosButton } from "@/components/shared/adjuntos-panel";
 import { MultiFileUploader } from "@/components/shared/multi-file-uploader";
 import { MantenimientoModalsEconomicos } from "@/components/mantenimiento/mantenimiento-modals-economicos";
 import type { CargadoPorAdjunto } from "@/lib/archivos-adjuntos";
+import { subirYVincularPostCreate } from "@/lib/adjuntos-client";
 import { FilterBar } from "@/components/shared/filter-bar";
 import { StatusBadge, estadoVariant } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -110,6 +112,7 @@ export function MantenimientoModule({
   const [aceptarOpen, setAceptarOpen] = useState(false);
   const [evidenciasCreate, setEvidenciasCreate] = useState<ArchivoAdjunto[]>([]);
   const [evidenciasEdit, setEvidenciasEdit] = useState<ArchivoAdjunto[]>([]);
+  const [pendingEvidenciasCreate, setPendingEvidenciasCreate] = useState<File[]>([]);
   const [selected, setSelected] = useState<Mantenimiento | null>(null);
   const [historialEventos, setHistorialEventos] = useState<EventoTrazabilidad[]>([]);
   const [formError, setFormError] = useState<string | null>(null);
@@ -172,15 +175,30 @@ export function MantenimientoModule({
       prioridad: fd.get("prioridad") as Mantenimiento["prioridad"],
       estado: "ABIERTO" as EstadoMantenimiento,
       solicitadoPorId: usuarioId,
-      evidenciasAdjuntas: evidenciasCreate,
+      evidenciasAdjuntas: [],
     };
     startTransition(async () => {
       try {
         const created = await crearMantenimientoAction(payload);
+        if (created && pendingEvidenciasCreate.length > 0) {
+          await subirYVincularPostCreate(
+            created.id,
+            pendingEvidenciasCreate,
+            {
+              bucket: "mantenimiento",
+              entidadTipo: "MANTENIMIENTO",
+              inmuebleId: created.inmuebleId,
+              linkMantenimientoId: created.id,
+              linkMantenimientoTipo: "EVIDENCIA",
+            },
+            (id, adj) => vincularEvidenciasMantenimientoAction(id, adj, "evidenciasAdjuntas")
+          );
+        }
         if (created) {
           setItems((prev) => [...prev, created]);
           setOpen(false);
           setEvidenciasCreate([]);
+          setPendingEvidenciasCreate([]);
           form.reset();
         }
       } catch (err) {
@@ -544,6 +562,7 @@ export function MantenimientoModule({
               value={evidenciasCreate}
               onChange={setEvidenciasCreate}
               cargadoPor={cargadoPor}
+              onPendingFilesChange={setPendingEvidenciasCreate}
             />
           </form>
         )}
@@ -601,6 +620,14 @@ export function MantenimientoModule({
               value={evidenciasEdit.length ? evidenciasEdit : selected.evidenciasAdjuntas ?? []}
               onChange={setEvidenciasEdit}
               cargadoPor={cargadoPor}
+              uploadContext={{
+                bucket: "mantenimiento",
+                entidadTipo: "MANTENIMIENTO",
+                entidadId: selected.id,
+                inmuebleId: selected.inmuebleId,
+                linkMantenimientoId: selected.id,
+                linkMantenimientoTipo: "EVIDENCIA",
+              }}
             />
           </form>
         )}

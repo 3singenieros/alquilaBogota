@@ -7,11 +7,13 @@ import {
   obtenerDatosPdfSoporteAction,
   rechazarPagoAction,
   validarPagoAction,
+  vincularComprobantesPagoAction,
 } from "@/app/(dashboard)/pagos/actions";
 import { SoportePagoDownload } from "@/components/pagos/soporte-pago-download";
 import { VerAdjuntosButton } from "@/components/shared/adjuntos-panel";
 import { MultiFileUploader } from "@/components/shared/multi-file-uploader";
 import type { CargadoPorAdjunto } from "@/lib/archivos-adjuntos";
+import { subirYVincularPostCreate } from "@/lib/adjuntos-client";
 import type { ArchivoAdjunto } from "@/types";
 import { FilterBar } from "@/components/shared/filter-bar";
 import { StatusBadge, estadoVariant } from "@/components/ui/badge";
@@ -59,6 +61,7 @@ export function PagosModule({
     rol,
   };
   const [comprobantes, setComprobantes] = useState<ArchivoAdjunto[]>([]);
+  const [pendingComprobantes, setPendingComprobantes] = useState<File[]>([]);
   const perms = getModulePermissions(rol, "pagos");
   const canReview = rol === "ARRENDADOR" || rol === "ADMIN";
   const canReport = rol === "ARRENDATARIO" || rol === "ADMIN";
@@ -125,9 +128,27 @@ export function PagosModule({
       notas: (fd.get("notas") as string) || undefined,
     };
     startTransition(async () => {
-      const created = await crearPagoAction(payload);
+      const created = await crearPagoAction({
+        ...payload,
+        comprobantesAdjuntos: [],
+      });
+      if (created && pendingComprobantes.length > 0) {
+        const contrato = contratosOptions.find((c) => c.id === payload.contratoId);
+        await subirYVincularPostCreate(
+          created.id,
+          pendingComprobantes,
+          {
+            bucket: "pagos",
+            entidadTipo: "PAGO",
+            contratoId: payload.contratoId,
+            inmuebleId: contrato?.inmuebleId,
+          },
+          vincularComprobantesPagoAction
+        );
+      }
       if (created) setItems((prev) => [...prev, created]);
       setComprobantes([]);
+      setPendingComprobantes([]);
       setOpen(false);
     });
   }
@@ -337,6 +358,7 @@ export function PagosModule({
             value={comprobantes}
             onChange={setComprobantes}
             cargadoPor={cargadoPor}
+            onPendingFilesChange={setPendingComprobantes}
           />
           <FormField label="Notas">
             <Input name="notas" />

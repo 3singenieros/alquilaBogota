@@ -112,6 +112,10 @@ export function prepararEvidenciasMantenimiento(
   };
 }
 
+export function debeRegistrarTrazabilidadAdjuntos(adjuntos: ArchivoAdjunto[]): boolean {
+  return adjuntos.length > 0 && adjuntos.every((a) => !a.bucket && !a.path);
+}
+
 export function metadataAdjuntosTrazabilidad(
   adjuntos: ArchivoAdjunto[],
   entidadTipo: EntidadTipoTrazabilidad,
@@ -121,6 +125,8 @@ export function metadataAdjuntosTrazabilidad(
   return {
     cantidadArchivos: adjuntos.length,
     nombresArchivos: adjuntos.map((a) => a.nombre),
+    bucket: adjuntos.map((a) => a.bucket).filter(Boolean),
+    paths: adjuntos.map((a) => a.path).filter(Boolean),
     entidadTipo,
     entidadId,
     ...extra,

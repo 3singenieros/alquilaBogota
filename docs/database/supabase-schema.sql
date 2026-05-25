@@ -197,6 +197,10 @@ create table if not exists archivo_adjunto (
   path text,
   public_url text,
   url_simulada text,
+  entidad_tipo text,
+  entidad_id text,
+  contrato_id text references contratos(id) on delete set null,
+  inmueble_id text references inmuebles(id) on delete set null,
   descripcion text,
   uploaded_at timestamptz,
   uploaded_by text references usuarios(id) on delete set null,
@@ -208,6 +212,8 @@ create table if not exists archivo_adjunto (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+create index if not exists idx_archivo_adjunto_entidad on archivo_adjunto(entidad_tipo, entidad_id);
 
 create index if not exists idx_archivo_adjunto_bucket_path on archivo_adjunto(bucket, path);
 

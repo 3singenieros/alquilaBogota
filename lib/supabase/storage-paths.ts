@@ -1,5 +1,17 @@
 import type { StorageBucketKey } from "@/lib/config";
 
+/** Ruta estándar: {entidadTipo}/{entidadId}/{timestamp}-{filename} */
+export function buildStorageObjectPath(input: {
+  entidadTipo: string;
+  entidadId: string;
+  filename: string;
+  timestamp?: number;
+}): string {
+  const safe = input.filename.replace(/[^a-zA-Z0-9._-]/g, "_");
+  const ts = input.timestamp ?? Date.now();
+  return `${input.entidadTipo}/${input.entidadId}/${ts}-${safe}`;
+}
+
 /** Rutas sugeridas dentro de cada bucket de Supabase Storage. */
 export const STORAGE_PATHS = {
   contratoDocumento: (contratoCode: string, filename: string) =>

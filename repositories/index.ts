@@ -65,6 +65,11 @@ import {
   type SoportePagoRepository,
 } from "@/repositories/soporte-pago.repository";
 import {
+  fileMockRepository,
+  fileSupabaseRepository,
+  type FileRepository,
+} from "@/repositories/file.repository";
+import {
   trazabilidadMockRepository,
   trazabilidadSupabaseRepository,
   type TrazabilidadRepository,
@@ -133,4 +138,8 @@ export function getTrazabilidadRepository(): TrazabilidadRepository {
   return pick(trazabilidadMockRepository, trazabilidadSupabaseRepository);
 }
 
-export { getFileRepository, supabaseReportQueries } from "@/repositories/supabase";
+export function getFileRepository(): FileRepository {
+  return pick(fileMockRepository, fileSupabaseRepository);
+}
+
+export { supabaseReportQueries } from "@/repositories/supabase";

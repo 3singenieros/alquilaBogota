@@ -8,11 +8,14 @@ import {
   listarInmueblesParaContratoFormAction,
 } from "@/app/(dashboard)/contratos/actions";
 import { listarHistorialContratoAction } from "@/app/(dashboard)/trazabilidad/actions";
+import { listarArchivosEntidadAction } from "@/app/actions/file-storage.actions";
 import { HistorialTimeline } from "@/components/trazabilidad/historial-timeline";
 import { FormSection } from "@/components/shared/form-section";
 import { VerAdjuntosButton } from "@/components/shared/adjuntos-panel";
+import { AttachmentsList } from "@/components/shared/attachments-list";
 import { MultiFileUploader } from "@/components/shared/multi-file-uploader";
 import type { CargadoPorAdjunto } from "@/lib/archivos-adjuntos";
+import { subirAdjuntosTrasCrear } from "@/lib/adjuntos-client";
 import type { ArchivoAdjunto } from "@/types";
 import { FilterBar } from "@/components/shared/filter-bar";
 import { StatusBadge, estadoVariant } from "@/components/ui/badge";
@@ -80,6 +83,7 @@ export function ContratosModule({
     rol,
   };
   const [documentosContrato, setDocumentosContrato] = useState<ArchivoAdjunto[]>([]);
+  const [pendingDocFiles, setPendingDocFiles] = useState<File[]>([]);
   const perms = getModulePermissions(rol, "contratos");
   const [inmueblesOptions, setInmueblesOptions] = useState(inmuebles);
   const inmueblesMap = useMemo(() => inmueblesById(inmueblesOptions), [inmueblesOptions]);
@@ -112,8 +116,25 @@ export function ContratosModule({
     setInmueblesOptions(fresh);
     setFormError(null);
     setEditing(editingItem);
-    setDocumentosContrato(editingItem?.documentosAdjuntos ?? []);
+    if (editingItem) {
+      const docs = await listarArchivosEntidadAction("CONTRATO", editingItem.id);
+      setDocumentosContrato(docs);
+    } else {
+      setDocumentosContrato([]);
+    }
+    setPendingDocFiles([]);
     setOpen(true);
+  }
+
+  function handleDocumentosChange(docs: ArchivoAdjunto[]) {
+    setDocumentosContrato(docs);
+    if (editing) {
+      setItems((prev) =>
+        prev.map((i) =>
+          i.id === editing.id ? { ...i, documentosAdjuntos: docs } : i
+        )
+      );
+    }
   }
 
   const filtered = useMemo(
@@ -156,12 +177,34 @@ export function ContratosModule({
           setFormError("No hay inmuebles disponibles sin contrato activo.");
           return;
         }
-        const result = await crearContratoAction(payload);
+        const result = await crearContratoAction({
+          ...payload,
+          documentosAdjuntos: [],
+        });
         if (!result.ok) {
           setFormError(result.error);
           return;
         }
-        if (result.data) setItems((prev) => [...prev, result.data!]);
+        if (result.data && pendingDocFiles.length > 0) {
+          const docs = await subirAdjuntosTrasCrear([], pendingDocFiles, {
+            bucket: "contratos",
+            entidadTipo: "CONTRATO",
+            entidadId: result.data.id,
+            contratoId: result.data.id,
+            inmuebleId: result.data.inmuebleId,
+            linkContratoId: result.data.id,
+          });
+          const upd = await actualizarContratoAction(result.data.id, {
+            documentosAdjuntos: docs,
+          });
+          if (upd.ok && upd.data) {
+            setItems((prev) => [...prev, upd.data!]);
+          } else {
+            setItems((prev) => [...prev, result.data!]);
+          }
+        } else if (result.data) {
+          setItems((prev) => [...prev, result.data!]);
+        }
       }
       setOpen(false);
       setEditing(null);
@@ -223,6 +266,7 @@ export function ContratosModule({
               <Th>Preaviso</Th>
               <Th>Codeudor</Th>
               <Th>Depósito</Th>
+              <Th>Docs</Th>
               <Th className="text-right">Acciones</Th>
             </tr>
           </thead>
@@ -247,6 +291,22 @@ export function ContratosModule({
                   <StatusBadge
                     label={c.depositoGarantiaEstado}
                     variant={estadoVariant(c.depositoGarantiaEstado)}
+                  />
+                </Td>
+                <Td>
+                  <VerAdjuntosButton
+                    titulo={`Documentos — ${c.code}`}
+                    entidadTipo="CONTRATO"
+                    entidadId={c.id}
+                    canDelete={perms.canEdit}
+                    listas={[
+                      {
+                        etiqueta: "Contrato",
+                        archivos: c.documentosAdjuntos,
+                        entidadTipo: "CONTRATO",
+                        entidadId: c.id,
+                      },
+                    ]}
                   />
                 </Td>
                 <Td className="text-right whitespace-nowrap">
@@ -529,10 +589,39 @@ export function ContratosModule({
                 <MultiFileUploader
                   label="Documentos del contrato (firmado, cédulas, inventario…)"
                   value={documentosContrato}
-                  onChange={setDocumentosContrato}
+                  onChange={handleDocumentosChange}
                   cargadoPor={cargadoPor}
                   allowDescriptions
+                  onPendingFilesChange={setPendingDocFiles}
+                  uploadContext={
+                    editing
+                      ? {
+                          bucket: "contratos",
+                          entidadTipo: "CONTRATO",
+                          entidadId: editing.id,
+                          contratoId: editing.id,
+                          inmuebleId: editing.inmuebleId,
+                          linkContratoId: editing.id,
+                        }
+                      : undefined
+                  }
                 />
+                {editing && documentosContrato.length > 0 && (
+                  <div className="mt-3">
+                    <p className="mb-2 text-xs font-medium text-slate-600">
+                      Ver o descargar documentos ya cargados
+                    </p>
+                    <AttachmentsList
+                      archivos={documentosContrato}
+                      entidadTipo="CONTRATO"
+                      entidadId={editing.id}
+                      canDelete={perms.canEdit}
+                      onDeleted={(id) =>
+                        handleDocumentosChange(documentosContrato.filter((a) => a.id !== id))
+                      }
+                    />
+                  </div>
+                )}
               </FormSection>
             </>
           )}

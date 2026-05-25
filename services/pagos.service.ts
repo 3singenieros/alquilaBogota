@@ -10,7 +10,7 @@ import {
 import { assertModuleAccess, requireSession } from "@/services/auth.service";
 import { sendPaymentSupportEmail } from "@/services/email.service";
 import { registrarNotificacion } from "@/services/notificaciones.service";
-import type { CreateInput, PagoReportado, UpdateInput } from "@/types";
+import type { ArchivoAdjunto, CreateInput, PagoReportado, UpdateInput } from "@/types";
 import { auditActorFromUsuario } from "@/lib/audit/actor";
 import { contextoDesdeContrato } from "@/lib/audit/context";
 import {
@@ -18,7 +18,7 @@ import {
   traceCambioEstado,
   traceEvento,
 } from "@/lib/audit/trace-helper";
-import { prepararComprobantes } from "@/lib/archivos-adjuntos";
+import { debeRegistrarTrazabilidadAdjuntos, prepararComprobantes } from "@/lib/archivos-adjuntos";
 import { traceAdjuntosAgregados } from "@/lib/audit/trace-adjuntos";
 import { formatCurrency } from "@/lib/utils";
 
@@ -115,7 +115,7 @@ export async function crearPago(data: CreateInput<PagoReportado>) {
     valoresNuevos: { monto: created.monto, mes: created.mes },
   });
 
-  if (comprobantesAdjuntos.length > 0) {
+  if (comprobantesAdjuntos.length > 0 && debeRegistrarTrazabilidadAdjuntos(comprobantesAdjuntos)) {
     await traceAdjuntosAgregados(actor, {
       entidadTipo: "PAGO",
       entidadId: created.id,
@@ -296,6 +296,31 @@ export async function actualizarPago(id: string, data: UpdateInput<PagoReportado
   }
 
   return getPagosRepository().update(id, data);
+}
+
+export async function vincularComprobantesPago(
+  pagoId: string,
+  adjuntos: ArchivoAdjunto[]
+) {
+  const { usuario } = await requireSession();
+  assertModuleAccess(usuario.rol, "pagos");
+  const pago = await getPagosRepository().findById(pagoId);
+  if (!pago) {
+    throw new AuthError("Pago no encontrado", "FORBIDDEN");
+  }
+  await assertPagoAccess(pago.contratoId);
+  const rol = rolEfectivo(usuario);
+  const puede =
+    rol === "ADMIN" ||
+    rol === "ARRENDADOR" ||
+    (rol === "ARRENDATARIO" &&
+      pago.reportadoPorId === usuario.id &&
+      pago.estado === "REPORTADO");
+  if (!puede) {
+    throw new AuthError("Sin permiso para adjuntar comprobantes", "FORBIDDEN");
+  }
+  const { comprobantesAdjuntos, comprobanteUrl } = prepararComprobantes(adjuntos);
+  return getPagosRepository().update(pagoId, { comprobantesAdjuntos, comprobanteUrl });
 }
 
 export async function eliminarPago(id: string) {

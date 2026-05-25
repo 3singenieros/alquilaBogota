@@ -2,7 +2,7 @@ import { AuthError } from "@/lib/auth/errors";
 import { auditActorFromUsuario } from "@/lib/audit/actor";
 import { traceAdjuntosAgregados } from "@/lib/audit/trace-adjuntos";
 import { traceCambioEstado, traceEvento } from "@/lib/audit/trace-helper";
-import { combinarAdjuntos, metadataAdjuntosTrazabilidad } from "@/lib/archivos-adjuntos";
+import { combinarAdjuntos, debeRegistrarTrazabilidadAdjuntos, metadataAdjuntosTrazabilidad } from "@/lib/archivos-adjuntos";
 import { arrendadorPuedeGestionarEstado } from "@/lib/mantenimiento-reglas";
 import {
   aceptacionInicial,
@@ -276,7 +276,7 @@ export async function cerrarMantenimientoTicket(
     });
   }
 
-  if (docsCierre.length > 0) {
+  if (docsCierre.length > 0 && debeRegistrarTrazabilidadAdjuntos(docsCierre)) {
     await traceAdjuntosAgregados(actor, {
       entidadTipo: "MANTENIMIENTO",
       entidadId: id,

@@ -21,6 +21,7 @@ import {
 } from "@/lib/audit/trace-helper";
 import {
   combinarAdjuntos,
+  debeRegistrarTrazabilidadAdjuntos,
   prepararEvidenciasMantenimiento,
 } from "@/lib/archivos-adjuntos";
 import {
@@ -39,6 +40,7 @@ import {
 } from "@/repositories";
 import { registrarNotificacion } from "@/services/notificaciones.service";
 import type {
+  ArchivoAdjunto,
   ComentarioMantenimiento,
   CreateInput,
   EstadoMantenimiento,
@@ -221,7 +223,7 @@ export async function crearMantenimiento(data: CreateInput<Mantenimiento>) {
     ctx,
     "MANTENIMIENTO_CREADO"
   );
-  if (ev.evidenciasAdjuntas.length > 0) {
+  if (ev.evidenciasAdjuntas.length > 0 && debeRegistrarTrazabilidadAdjuntos(ev.evidenciasAdjuntas)) {
     await traceAdjuntosAgregados(actor, {
       entidadTipo: "MANTENIMIENTO",
       entidadId: created.id,
@@ -233,6 +235,22 @@ export async function crearMantenimiento(data: CreateInput<Mantenimiento>) {
   }
   await notificarTicketCreado(created);
   return created;
+}
+
+export async function vincularEvidenciasMantenimiento(
+  mantenimientoId: string,
+  adjuntos: ArchivoAdjunto[],
+  campo: "evidenciasAdjuntas" | "documentosCierreAdjuntos" = "evidenciasAdjuntas"
+) {
+  const existing = await getMantenimientoRepository().findById(mantenimientoId);
+  if (!existing) throw new AuthError("Ticket no encontrado", "FORBIDDEN");
+  await assertAccesoMantenimiento(existing);
+  const prep = prepararEvidenciasMantenimiento(adjuntos);
+  const merged = combinarAdjuntos(existing[campo], prep.evidenciasAdjuntas);
+  return getMantenimientoRepository().update(mantenimientoId, {
+    [campo]: merged,
+    adjuntoUrl: prep.adjuntoUrl ?? existing.adjuntoUrl,
+  });
 }
 
 /** Actualiza solo contenido de solicitud (título, descripción, prioridad, evidencia). */

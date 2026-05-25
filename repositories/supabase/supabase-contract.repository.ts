@@ -2,6 +2,10 @@ import { ENTITY_CODE_PREFIX, generateUniqueCode } from "@/lib/entity-codes";
 import { requireSupabase, extractEntityCodes, nullableFkId } from "@/lib/supabase/helpers";
 import type { ContratosRepository } from "@/repositories/contratos.repository";
 import type { InvitacionesContratoRepository } from "@/repositories/invitaciones-contrato.repository";
+import {
+  contratoConDocumentos,
+  fetchDocumentosPorContratos,
+} from "@/repositories/supabase/supabase-contrato-documentos";
 import type { Contrato, CreateInput, InvitacionContrato, UpdateInput } from "@/types";
 
 function mapContratoRow(r: Record<string, unknown>): Contrato {
@@ -107,12 +111,17 @@ export const supabaseContractRepository: ContratosRepository = {
     const sb = requireSupabase();
     const { data, error } = await sb.from("contratos").select("*").is("deleted_at", null);
     if (error) throw error;
-    return (data ?? []).map((r) => mapContratoRow(r as Record<string, unknown>));
+    const rows = (data ?? []).map((r) => mapContratoRow(r as Record<string, unknown>));
+    const docMap = await fetchDocumentosPorContratos(rows.map((c) => c.id));
+    return rows.map((c) => ({ ...c, ...contratoConDocumentos(c, docMap) }));
   },
   findById: async (id) => {
     const sb = requireSupabase();
     const { data } = await sb.from("contratos").select("*").eq("id", id).maybeSingle();
-    return data ? mapContratoRow(data as Record<string, unknown>) : null;
+    if (!data) return null;
+    const contrato = mapContratoRow(data as Record<string, unknown>);
+    const docMap = await fetchDocumentosPorContratos([id]);
+    return { ...contrato, ...contratoConDocumentos(contrato, docMap) };
   },
   create: async (input) => {
     const sb = requireSupabase();
@@ -134,7 +143,10 @@ export const supabaseContractRepository: ContratosRepository = {
       .eq("id", id)
       .select()
       .maybeSingle();
-    return data ? mapContratoRow(data as Record<string, unknown>) : null;
+    if (!data) return null;
+    const contrato = mapContratoRow(data as Record<string, unknown>);
+    const docMap = await fetchDocumentosPorContratos([id]);
+    return { ...contrato, ...contratoConDocumentos(contrato, docMap) };
   },
   delete: async (id) => {
     const sb = requireSupabase();

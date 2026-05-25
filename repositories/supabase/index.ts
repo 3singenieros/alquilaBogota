@@ -6,5 +6,5 @@ export { supabaseServicesRepository, supabasePagosServicioRepository, supabaseNo
 export { supabaseMaintenanceRepository, supabaseComentariosMantenimientoRepository, mantenimientoSupabaseRepository, comentariosMantenimientoSupabaseRepository } from "./supabase-maintenance.repository";
 export { supabaseNonRenewalRepository, noRenovacionSupabaseRepository } from "./supabase-nonrenewal.repository";
 export { supabaseTrazabilidadRepository, trazabilidadSupabaseRepository } from "./supabase-trazabilidad.repository";
-export { supabaseFileRepository, getFileRepository } from "./supabase-file.repository";
+export { supabaseFileRepository } from "./supabase-file.repository";
 export { supabaseReportQueries, type ReporteFiltros, type SupabaseReportQueries } from "./supabase-report.repository";

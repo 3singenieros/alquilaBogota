@@ -22,7 +22,7 @@ import { auditActorFromUsuario } from "@/lib/audit/actor";
 import { contextoDesdeContrato } from "@/lib/audit/context";
 import { traceAdjuntosAgregados } from "@/lib/audit/trace-adjuntos";
 import { traceActualizacion, traceCambioEstado, traceEvento } from "@/lib/audit/trace-helper";
-import { prepararDocumentosContrato } from "@/lib/archivos-adjuntos";
+import { debeRegistrarTrazabilidadAdjuntos, prepararDocumentosContrato } from "@/lib/archivos-adjuntos";
 import {
   getContratosRepository,
   getInmueblesRepository,
@@ -427,7 +427,7 @@ export async function registrarEnvioNoRenovacion(
     metadata: metadataExpediente(updated),
   });
 
-  if (evidencias.length > 0) {
+  if (evidencias.length > 0 && debeRegistrarTrazabilidadAdjuntos(evidencias)) {
     await traceAdjuntosAgregados(actor, {
       entidadTipo: "NO_RENOVACION",
       entidadId: id,
